@@ -225,20 +225,34 @@ func (m model) View() string {
 	}
 
 	header := ui.TitleStyle.Render(appTitle)
-	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext)
+	focusOnFileList := m.focus == focusFileList
+	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext, focusOnFileList)
 
 	if m.err != nil {
 		errorBox := ui.ErrorBox(m.err, m.winWidth)
 		return lipgloss.JoinVertical(lipgloss.Top, header, errorBox, footer)
 	}
 
-	// Render file list sidebar
+	// Render file list sidebar with focus-aware styling
 	fileListContent := m.fileListView.View()
-	sidebarBox := ui.FileListStyle.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
+	var sidebarBox string
+	if focusOnFileList {
+		sidebarBox = ui.FileListStyleFocused.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
+	} else {
+		sidebarBox = ui.FileListStyle.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
+	}
 
-	// Render diff panes
-	leftBox := ui.BorderStyle.Width(m.leftView.Width).Render(m.leftView.View())
-	rightBox := ui.BorderStyle.Width(m.rightView.Width).Render(m.rightView.View())
+	// Render diff panes with focus-aware styling
+	var leftBox, rightBox string
+	if focusOnFileList {
+		// Diff panes are unfocused
+		leftBox = ui.BorderStyleUnfocused.Width(m.leftView.Width).Render(m.leftView.View())
+		rightBox = ui.BorderStyleUnfocused.Width(m.rightView.Width).Render(m.rightView.View())
+	} else {
+		// Diff panes are focused
+		leftBox = ui.BorderStyleFocused.Width(m.leftView.Width).Render(m.leftView.View())
+		rightBox = ui.BorderStyleFocused.Width(m.rightView.Width).Render(m.rightView.View())
+	}
 
 	// Join horizontally: sidebar | left diff | right diff
 	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebarBox, leftBox, rightBox)

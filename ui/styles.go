@@ -34,6 +34,11 @@ var (
 			BorderForeground(lipgloss.Color("62")).
 			Padding(0, 1)
 
+	FileListStyleFocused = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#7D56F4")).
+				Padding(0, 1)
+
 	FileListItemStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("252"))
 
@@ -42,8 +47,18 @@ var (
 				Foreground(lipgloss.Color("#FAFAFA")).
 				Bold(true)
 
-	StatsStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("244"))
+	// Stats styles with beautiful colors
+	AdditionsStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#43BF6D")).
+			Bold(true)
+
+	DeletionsStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#E05252")).
+			Bold(true)
+
+	DeltaStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#F5C842")).
+			Bold(true)
 
 	StatusModifiedStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#F5C842")).
@@ -56,4 +71,13 @@ var (
 	StatusDeletedStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#E05252")).
 				Bold(true)
+
+	// Border styles for focused/unfocused panes
+	BorderStyleFocused = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#7D56F4"))
+
+	BorderStyleUnfocused = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("62"))
 )

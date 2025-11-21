@@ -136,14 +136,22 @@ func renderFileListItem(file git.FileStat, selected bool) string {
 	// Status icon with color
 	icon := statusIcon(file.Status)
 
-	// Stats: +5 -2
-	stats := fmt.Sprintf("+%d -%d", file.Additions, file.Deletions)
-	statsStyled := StatsStyle.Render(stats)
-
 	// Filename (truncate if too long)
-	filename := truncate(file.Path, 30)
+	filename := truncate(file.Path, 25)
 
-	line := fmt.Sprintf("%s %-32s %s", icon, filename, statsStyled)
+	// Calculate delta (net change)
+	delta := file.Additions - file.Deletions
+	deltaSign := ""
+	if delta > 0 {
+		deltaSign = "+"
+	}
+
+	// Beautiful colored stats
+	additions := AdditionsStyle.Render(fmt.Sprintf("+%d", file.Additions))
+	deletions := DeletionsStyle.Render(fmt.Sprintf("-%d", file.Deletions))
+	deltaStyled := DeltaStyle.Render(fmt.Sprintf("(%s%d)", deltaSign, delta))
+
+	line := fmt.Sprintf("%s %s  %s %s %s", icon, filename, additions, deletions, deltaStyled)
 
 	if selected {
 		return SelectedFileStyle.Render(line)
@@ -173,7 +181,7 @@ func truncate(s string, maxLen int) string {
 }
 
 // RenderFooter renders the footer with keyboard shortcuts and feature states.
-func RenderFooter(showLineNumbers bool, fullContext bool) string {
+func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool) string {
 	lineNumHint := "on"
 	if !showLineNumbers {
 		lineNumHint = "off"
@@ -184,8 +192,14 @@ func RenderFooter(showLineNumbers bool, fullContext bool) string {
 		contextHint = "full"
 	}
 
+	focusHint := "diff"
+	if focusOnFileList {
+		focusHint = "files"
+	}
+
 	text := fmt.Sprintf(
-		"j/k: scroll/navigate • n: line numbers (%s) • c: context (%s) • q/esc: quit",
+		"tab: switch pane (%s) • j/k: scroll/navigate • n: line numbers (%s) • c: context (%s) • q/esc: quit",
+		focusHint,
 		lineNumHint,
 		contextHint,
 	)

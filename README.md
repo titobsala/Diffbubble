@@ -1,12 +1,16 @@
 # Side-by-Side Git Diff TUI
 
-A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling.
+A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, and beautiful color-coded statistics.
 
 ## Features
 
+- **Multi-file navigation**: Sidebar showing all modified files with colored stats
 - **Side-by-side diff display**: View old and new versions simultaneously
 - **Synchronized scrolling**: Both panes scroll together for easy comparison
-- **Line numbers**: Each line shows its position in the respective file
+- **Line numbers toggle**: Show/hide line numbers with 'n' key
+- **Context mode toggle**: Switch between focus mode (changes only) and full context (entire file)
+- **Beautiful statistics**: Color-coded additions (green), deletions (red), and delta (yellow)
+- **Focus indicators**: Visual cues show which pane is active (file list or diff)
 - **Syntax highlighting**: Added lines in green, removed lines in red
 - **Mouse support**: Click and scroll with your mouse
 - **Keyboard navigation**: Use arrow keys, j/k, or mouse wheel
@@ -26,5 +30,22 @@ A Terminal User Interface (TUI) application written in Go to display a side-by-s
 
 ## Controls
 
--   **Scroll:** Use the arrow keys (`↑`/`↓`), `j`/`k`, or your mouse wheel to scroll through the diff. Both panes will scroll simultaneously.
--   **Quit:** Press `q`, `esc`, or `ctrl+c` to exit the application.
+### Navigation
+-   **File list navigation:** When file list is focused, use `j`/`k` or `↑`/`↓` to select different files
+-   **Diff scrolling:** When diff is focused, use `j`/`k` or `↑`/`↓` to scroll through the diff. Both panes scroll simultaneously.
+-   **Switch pane:** Press `tab` to switch focus between file list and diff panes (purple border indicates focused pane)
+
+### Toggles
+-   **Line numbers:** Press `n` to toggle line numbers on/off (default: on)
+-   **Context mode:** Press `c` to toggle between focus mode (changes only) and full context (entire file)
+
+### General
+-   **Quit:** Press `q`, `esc`, or `ctrl+c` to exit the application
+
+### File List
+The sidebar shows:
+- Status icon: **M** (modified in yellow), **A** (added in green), **D** (deleted in red)
+- Filename
+- **+n** additions in green
+- **-n** deletions in red
+- **(±delta)** net change in yellow
