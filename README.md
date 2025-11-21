@@ -2,6 +2,15 @@
 
 A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling.
 
+## Features
+
+- **Side-by-side diff display**: View old and new versions simultaneously
+- **Synchronized scrolling**: Both panes scroll together for easy comparison
+- **Line numbers**: Each line shows its position in the respective file
+- **Syntax highlighting**: Added lines in green, removed lines in red
+- **Mouse support**: Click and scroll with your mouse
+- **Keyboard navigation**: Use arrow keys, j/k, or mouse wheel
+
 ## How to Run
 
 1.  **Prerequisites:** Ensure you have [Go](https://go.dev/doc/install) and [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) installed on your system.
