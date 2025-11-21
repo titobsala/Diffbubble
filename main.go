@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/titobsala/Diffbubble/config"
 	"github.com/titobsala/Diffbubble/git"
 	"github.com/titobsala/Diffbubble/parser"
 	"github.com/titobsala/Diffbubble/ui"
@@ -17,7 +18,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.1.0"
+	version  = "0.2.0"
 )
 
 type focusPane int
@@ -317,19 +318,24 @@ func printHelp() {
 	fmt.Println("Usage:")
 	fmt.Println("  diffbubble [flags]")
 	fmt.Println("\nFlags:")
-	fmt.Println("  -h, --help           Show this help message")
-	fmt.Println("  -v, --version        Show version information")
-	fmt.Println("  --file=<filename>    Open with specific file selected")
-	fmt.Println("  --staged             Show only staged changes (git diff --cached)")
-	fmt.Println("  --unstaged           Show only unstaged changes (default behavior)")
+	fmt.Println("  -h, --help               Show this help message")
+	fmt.Println("  -v, --version            Show version information")
+	fmt.Println("  --file=<filename>        Open with specific file selected")
+	fmt.Println("  --staged                 Show only staged changes (git diff --cached)")
+	fmt.Println("  --unstaged               Show only unstaged changes")
+	fmt.Println("  --theme=<name>           Color theme (default: dark)")
+	fmt.Println("                           Available: dark, light, high-contrast,")
+	fmt.Println("                           solarized, dracula, github")
 	fmt.Println("\nDescription:")
 	fmt.Println("  diffbubble displays git diffs in a beautiful side-by-side format with")
 	fmt.Println("  multi-file navigation, synchronized scrolling, and line numbers.")
 	fmt.Println("\nExamples:")
-	fmt.Println("  diffbubble                      # Show all changes (staged + unstaged)")
-	fmt.Println("  diffbubble --staged             # Show only staged changes")
-	fmt.Println("  diffbubble --unstaged           # Show only unstaged changes")
-	fmt.Println("  diffbubble --file=README.md     # Open with README.md selected")
+	fmt.Println("  diffbubble                          # Show all changes (staged + unstaged)")
+	fmt.Println("  diffbubble --staged                 # Show only staged changes")
+	fmt.Println("  diffbubble --unstaged               # Show only unstaged changes")
+	fmt.Println("  diffbubble --file=README.md         # Open with README.md selected")
+	fmt.Println("  diffbubble --theme=light            # Use light theme")
+	fmt.Println("  diffbubble --theme=dracula --staged # Dracula theme, staged only")
 	fmt.Println("\nKeyboard Controls:")
 	fmt.Println("  tab          Switch focus between file list and diff panes")
 	fmt.Println("  j/k, ↓/↑     Navigate files (when file list focused) or scroll diff")
@@ -342,12 +348,23 @@ func printHelp() {
 }
 
 func main() {
+	// Load configuration file (user + repo)
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("Warning: Failed to load config: %v\n", err)
+		fmt.Println("Using default configuration...")
+		cfg = &config.Config{} // Use empty config
+		*cfg = config.DefaultConfig()
+	}
+	cfg.Validate()
+
 	var (
 		showVersion  bool
 		showHelp     bool
 		selectedFile string
 		showStaged   bool
 		showUnstaged bool
+		themeName    string
 	)
 
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
@@ -357,6 +374,7 @@ func main() {
 	flag.StringVar(&selectedFile, "file", "", "Open with specific file selected")
 	flag.BoolVar(&showStaged, "staged", false, "Show only staged changes")
 	flag.BoolVar(&showUnstaged, "unstaged", false, "Show only unstaged changes")
+	flag.StringVar(&themeName, "theme", cfg.Theme, "Color theme (dark, light, high-contrast, solarized, dracula, github)")
 	flag.Parse()
 
 	if showVersion {
@@ -369,8 +387,15 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Determine diff mode based on flags
-	diffMode := git.DiffAll // Default: show all changes
+	// Validate and set theme (CLI flag or config file)
+	if !ui.ValidateTheme(themeName) {
+		fmt.Printf("Error: Invalid theme '%s'. Available themes: %v\n", themeName, ui.ListThemes())
+		os.Exit(1)
+	}
+	ui.SetTheme(themeName)
+
+	// Determine diff mode based on flags (CLI flags override config)
+	diffMode := git.DiffAll
 	if showStaged && showUnstaged {
 		fmt.Println("Error: Cannot use both --staged and --unstaged flags together")
 		os.Exit(1)
@@ -378,11 +403,25 @@ func main() {
 		diffMode = git.DiffStaged
 	} else if showUnstaged {
 		diffMode = git.DiffUnstaged
+	} else {
+		// Use config diff mode if no CLI flag provided
+		switch cfg.DiffMode {
+		case "staged":
+			diffMode = git.DiffStaged
+		case "unstaged":
+			diffMode = git.DiffUnstaged
+		default:
+			diffMode = git.DiffAll
+		}
 	}
+
+	// Determine initial context mode and line numbers from config
+	fullContext := cfg.ContextMode == "full"
 
 	p := tea.NewProgram(
 		model{
-			showLineNumbers: true, // Default on
+			showLineNumbers: cfg.LineNumbers, // From config
+			fullContext:     fullContext,     // From config
 			focus:           focusFileList,
 			diffMode:        diffMode,
 			initialFile:     selectedFile,

@@ -7,7 +7,7 @@
 
 A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, and beautiful color-coded statistics.
 
-> **Note:** This is an early release (v0.1.0). Features and APIs may change as the project evolves.
+> **Note:** Currently at v0.2.0. New features: CLI flags for file selection and diff modes!
 
 ## Features
 
