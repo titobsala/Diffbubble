@@ -164,8 +164,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.winHeight = msg.Height
 
 		// Calculate dimensions: 20-40-40 split
-		headerHeight := 2
-		footerHeight := 2
+		// Increased margin to account for header, footer, borders, and potential text wrapping
+		headerHeight := 3  // Title + margin + buffer
+		footerHeight := 3  // Footer can wrap to 2-3 lines in narrow terminals
 		verticalMarginHeight := headerHeight + footerHeight
 
 		// 20% for sidebar, 40% for each diff pane
@@ -226,7 +227,7 @@ func (m model) View() string {
 
 	header := ui.TitleStyle.Render(appTitle)
 	focusOnFileList := m.focus == focusFileList
-	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext, focusOnFileList)
+	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext, focusOnFileList, m.winWidth)
 
 	if m.err != nil {
 		errorBox := ui.ErrorBox(m.err, m.winWidth)

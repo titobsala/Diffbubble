@@ -181,7 +181,7 @@ func truncate(s string, maxLen int) string {
 }
 
 // RenderFooter renders the footer with keyboard shortcuts and feature states.
-func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool) string {
+func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, termWidth int) string {
 	lineNumHint := "on"
 	if !showLineNumbers {
 		lineNumHint = "off"
@@ -197,12 +197,24 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool) 
 		focusHint = "files"
 	}
 
-	text := fmt.Sprintf(
-		"tab: switch pane (%s) • j/k: scroll/navigate • n: line numbers (%s) • c: context (%s) • q/esc: quit",
-		focusHint,
-		lineNumHint,
-		contextHint,
-	)
+	var text string
+	if termWidth < 120 {
+		// Shortened version for narrow terminals
+		text = fmt.Sprintf(
+			"tab:pane(%s) • j/k:nav • n:nums(%s) • c:ctx(%s) • q:quit",
+			focusHint,
+			lineNumHint,
+			contextHint,
+		)
+	} else {
+		// Full version for wider terminals
+		text = fmt.Sprintf(
+			"tab: switch pane (%s) • j/k: scroll/navigate • n: line numbers (%s) • c: context (%s) • q/esc: quit",
+			focusHint,
+			lineNumHint,
+			contextHint,
+		)
+	}
 
 	return FooterStyle.Render(text)
 }
