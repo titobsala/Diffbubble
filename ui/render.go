@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"diffbuble/git"
 	"diffbuble/parser"
 )
 
@@ -16,9 +17,12 @@ const (
 )
 
 // RenderSide turns structured diff rows into a string suitable for a viewport.
-func RenderSide(rows []parser.DiffRow, side Side) string {
+func RenderSide(rows []parser.DiffRow, side Side, showLineNumbers bool) string {
 	var sb strings.Builder
-	width := lineNumberWidth(rows, side)
+	width := 0
+	if showLineNumbers {
+		width = lineNumberWidth(rows, side)
+	}
 
 	for _, row := range rows {
 		line := rowForSide(row, side)
@@ -27,7 +31,7 @@ func RenderSide(rows []parser.DiffRow, side Side) string {
 			continue
 		}
 
-		sb.WriteString(renderLine(line, side, width))
+		sb.WriteString(renderLine(line, side, width, showLineNumbers))
 		sb.WriteByte('\n')
 	}
 
@@ -52,17 +56,21 @@ func renderHeader(content string) string {
 	return separator + "\n" + header + "\n"
 }
 
-func renderLine(line *parser.DiffLine, side Side, width int) string {
+func renderLine(line *parser.DiffLine, side Side, width int, showLineNumbers bool) string {
 	if line == nil {
-		return strings.Repeat(" ", width+1)
+		if showLineNumbers {
+			return strings.Repeat(" ", width+1)
+		}
+		return ""
 	}
 
-	number := ""
-	if line.Number > 0 {
-		number = strconv.Itoa(line.Number)
+	var text string
+	if showLineNumbers && line.Number > 0 {
+		number := strconv.Itoa(line.Number)
+		text = fmt.Sprintf("%*s %s", width, number, line.Content)
+	} else {
+		text = line.Content
 	}
-
-	text := fmt.Sprintf("%*s %s", width, number, line.Content)
 
 	switch line.Kind {
 	case parser.LineKindAddition:
@@ -104,4 +112,77 @@ func rowForSide(row parser.DiffRow, side Side) *parser.DiffLine {
 		return row.Left
 	}
 	return row.Right
+}
+
+// RenderFileList generates the sidebar content showing all modified files.
+func RenderFileList(files []git.FileStat, selectedIdx int) string {
+	var sb strings.Builder
+
+	if len(files) == 0 {
+		sb.WriteString("No modified files")
+		return sb.String()
+	}
+
+	for i, file := range files {
+		isSelected := (i == selectedIdx)
+		sb.WriteString(renderFileListItem(file, isSelected))
+		sb.WriteByte('\n')
+	}
+
+	return sb.String()
+}
+
+func renderFileListItem(file git.FileStat, selected bool) string {
+	// Status icon with color
+	icon := statusIcon(file.Status)
+
+	// Stats: +5 -2
+	stats := fmt.Sprintf("+%d -%d", file.Additions, file.Deletions)
+	statsStyled := StatsStyle.Render(stats)
+
+	// Filename (truncate if too long)
+	filename := truncate(file.Path, 30)
+
+	line := fmt.Sprintf("%s %-32s %s", icon, filename, statsStyled)
+
+	if selected {
+		return SelectedFileStyle.Render(line)
+	}
+	return FileListItemStyle.Render(line)
+}
+
+func statusIcon(status git.FileStatus) string {
+	switch status {
+	case git.StatusModified:
+		return StatusModifiedStyle.Render("M")
+	case git.StatusAdded:
+		return StatusAddedStyle.Render("A")
+	case git.StatusDeleted:
+		return StatusDeletedStyle.Render("D")
+	case git.StatusRenamed:
+		return StatusModifiedStyle.Render("R")
+	}
+	return "?"
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
+}
+
+// RenderFooter renders the footer with keyboard shortcuts and line number state.
+func RenderFooter(showLineNumbers bool) string {
+	lineNumHint := "on"
+	if !showLineNumbers {
+		lineNumHint = "off"
+	}
+
+	text := fmt.Sprintf(
+		"j/k: scroll/navigate • n: line numbers (%s) • q/esc: quit",
+		lineNumHint,
+	)
+
+	return FooterStyle.Render(text)
 }
