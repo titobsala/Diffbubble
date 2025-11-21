@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"diffbubble/git"
-	"diffbubble/parser"
-	"diffbubble/ui"
+	"github.com/titobsala/Diffbubble/git"
+	"github.com/titobsala/Diffbubble/parser"
+	"github.com/titobsala/Diffbubble/ui"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -46,7 +46,9 @@ type model struct {
 
 	// Feature toggles
 	showLineNumbers bool
-	fullContext     bool // false = focus mode (default), true = full context mode
+	fullContext     bool         // false = focus mode (default), true = full context mode
+	diffMode        git.DiffMode // Which changes to show (all, staged, unstaged)
+	initialFile     string       // File to pre-select on startup (if specified)
 }
 
 // Message types for async operations
@@ -61,7 +63,7 @@ type fileDiffLoadedMsg struct {
 }
 
 func (m model) Init() tea.Cmd {
-	return loadFilesCmd()
+	return loadFilesCmd(m.diffMode, m.initialFile)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -91,7 +93,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.fullContext = !m.fullContext
 			// Reload current file's diff with new context
 			if len(m.files) > 0 && m.selectedFile >= 0 && m.selectedFile < len(m.files) {
-				return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext)
+				return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode)
 			}
 			return m, nil
 
@@ -109,7 +111,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Navigate file list
 				if m.selectedFile < len(m.files)-1 {
 					m.selectedFile++
-					return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext)
+					return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode)
 				}
 				return m, nil
 			}
@@ -120,7 +122,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Navigate file list
 				if m.selectedFile > 0 {
 					m.selectedFile--
-					return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext)
+					return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode)
 				}
 				return m, nil
 			}
@@ -136,9 +138,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.ready {
 				m.fileListView.SetContent(ui.RenderFileList(m.files, m.selectedFile))
 			}
-			// Auto-load first file's diff
+
+			// Select initial file (either specified via --file flag or default to first)
 			m.selectedFile = 0
-			return m, loadFileDiffCmd(m.files[0].Path, m.fullContext)
+			if m.initialFile != "" {
+				// Find the specified file in the list
+				for i, file := range m.files {
+					if file.Path == m.initialFile {
+						m.selectedFile = i
+						break
+					}
+				}
+			}
+
+			return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode)
 		}
 		return m, nil
 
@@ -170,8 +183,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Calculate dimensions: 20-40-40 split
 		// Increased margin to account for header, footer, borders, and potential text wrapping
-		headerHeight := 3  // Title + margin + buffer
-		footerHeight := 3  // Footer can wrap to 2-3 lines in narrow terminals
+		headerHeight := 3 // Title + margin + buffer
+		footerHeight := 3 // Footer can wrap to 2-3 lines in narrow terminals
 		verticalMarginHeight := headerHeight + footerHeight
 
 		// 20% for sidebar, 40% for each diff pane
@@ -266,21 +279,21 @@ func (m model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Top, header, body, footer)
 }
 
-func loadFilesCmd() tea.Cmd {
+func loadFilesCmd(mode git.DiffMode, initialFile string) tea.Cmd {
 	return func() tea.Msg {
-		files, err := git.GetModifiedFiles()
+		files, err := git.GetModifiedFiles(mode)
 		return filesLoadedMsg{files: files, err: err}
 	}
 }
 
-func loadFileDiffCmd(filepath string, fullContext bool) tea.Cmd {
+func loadFileDiffCmd(filepath string, fullContext bool, mode git.DiffMode) tea.Cmd {
 	return func() tea.Msg {
 		contextLines := 0 // default
 		if fullContext {
 			contextLines = -1 // full context
 		}
 
-		diffOutput, err := git.GetFileDiff(filepath, contextLines)
+		diffOutput, err := git.GetFileDiff(filepath, contextLines, mode)
 		if err != nil {
 			return fileDiffLoadedMsg{err: err}
 		}
@@ -304,11 +317,19 @@ func printHelp() {
 	fmt.Println("Usage:")
 	fmt.Println("  diffbubble [flags]")
 	fmt.Println("\nFlags:")
-	fmt.Println("  -h, --help       Show this help message")
-	fmt.Println("  -v, --version    Show version information")
+	fmt.Println("  -h, --help           Show this help message")
+	fmt.Println("  -v, --version        Show version information")
+	fmt.Println("  --file=<filename>    Open with specific file selected")
+	fmt.Println("  --staged             Show only staged changes (git diff --cached)")
+	fmt.Println("  --unstaged           Show only unstaged changes (default behavior)")
 	fmt.Println("\nDescription:")
 	fmt.Println("  diffbubble displays git diffs in a beautiful side-by-side format with")
 	fmt.Println("  multi-file navigation, synchronized scrolling, and line numbers.")
+	fmt.Println("\nExamples:")
+	fmt.Println("  diffbubble                      # Show all changes (staged + unstaged)")
+	fmt.Println("  diffbubble --staged             # Show only staged changes")
+	fmt.Println("  diffbubble --unstaged           # Show only unstaged changes")
+	fmt.Println("  diffbubble --file=README.md     # Open with README.md selected")
 	fmt.Println("\nKeyboard Controls:")
 	fmt.Println("  tab          Switch focus between file list and diff panes")
 	fmt.Println("  j/k, ↓/↑     Navigate files (when file list focused) or scroll diff")
@@ -322,14 +343,20 @@ func printHelp() {
 
 func main() {
 	var (
-		showVersion bool
-		showHelp    bool
+		showVersion  bool
+		showHelp     bool
+		selectedFile string
+		showStaged   bool
+		showUnstaged bool
 	)
 
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&showVersion, "v", false, "Show version information (shorthand)")
 	flag.BoolVar(&showHelp, "help", false, "Show help message")
 	flag.BoolVar(&showHelp, "h", false, "Show help message (shorthand)")
+	flag.StringVar(&selectedFile, "file", "", "Open with specific file selected")
+	flag.BoolVar(&showStaged, "staged", false, "Show only staged changes")
+	flag.BoolVar(&showUnstaged, "unstaged", false, "Show only unstaged changes")
 	flag.Parse()
 
 	if showVersion {
@@ -342,10 +369,23 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Determine diff mode based on flags
+	diffMode := git.DiffAll // Default: show all changes
+	if showStaged && showUnstaged {
+		fmt.Println("Error: Cannot use both --staged and --unstaged flags together")
+		os.Exit(1)
+	} else if showStaged {
+		diffMode = git.DiffStaged
+	} else if showUnstaged {
+		diffMode = git.DiffUnstaged
+	}
+
 	p := tea.NewProgram(
 		model{
 			showLineNumbers: true, // Default on
 			focus:           focusFileList,
+			diffMode:        diffMode,
+			initialFile:     selectedFile,
 		},
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),

@@ -9,6 +9,15 @@ import (
 	"strings"
 )
 
+// DiffMode represents which changes to show
+type DiffMode int
+
+const (
+	DiffAll      DiffMode = iota // Both staged and unstaged (default)
+	DiffStaged                   // Only staged changes (--cached)
+	DiffUnstaged                 // Only unstaged changes
+)
+
 // FileStatus represents the status of a modified file.
 type FileStatus int
 
@@ -40,16 +49,29 @@ func Diff() ([]byte, error) {
 }
 
 // GetModifiedFiles returns a list of all files with changes and their stats.
-func GetModifiedFiles() ([]FileStat, error) {
+func GetModifiedFiles(mode DiffMode) ([]FileStat, error) {
+	// Build git diff arguments based on mode
+	var diffArgs []string
+	switch mode {
+	case DiffStaged:
+		diffArgs = []string{"diff", "--cached"}
+	case DiffUnstaged:
+		diffArgs = []string{"diff"}
+	default: // DiffAll
+		diffArgs = []string{"diff", "HEAD"}
+	}
+
 	// Get file stats (additions/deletions)
-	numstatCmd := exec.Command("git", "diff", "--numstat")
+	numstatArgs := append(diffArgs, "--numstat")
+	numstatCmd := exec.Command("git", numstatArgs...)
 	numstatOut, err := numstatCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("running git diff --numstat: %w", err)
 	}
 
 	// Get file status (M/A/D/R)
-	statusCmd := exec.Command("git", "diff", "--name-status")
+	statusArgs := append(diffArgs, "--name-status")
+	statusCmd := exec.Command("git", statusArgs...)
 	statusOut, err := statusCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("running git diff --name-status: %w", err)
@@ -124,20 +146,33 @@ func GetModifiedFiles() ([]FileStat, error) {
 
 // GetFileDiff returns the unified diff for a specific file.
 // contextLines specifies how many context lines to show (0 for default, -1 for full file)
-func GetFileDiff(filepath string, contextLines int) ([]byte, error) {
-	var cmd *exec.Cmd
-	if contextLines == -1 {
-		// Full context mode - show entire file
-		cmd = exec.Command("git", "diff", "-U999999", "--", filepath)
-	} else if contextLines > 0 {
-		// Custom context lines
-		contextArg := fmt.Sprintf("-U%d", contextLines)
-		cmd = exec.Command("git", "diff", contextArg, "--", filepath)
-	} else {
-		// Default context (usually 3 lines)
-		cmd = exec.Command("git", "diff", "--", filepath)
+// mode specifies which changes to show (staged, unstaged, or all)
+func GetFileDiff(filepath string, contextLines int, mode DiffMode) ([]byte, error) {
+	// Build base command arguments based on mode
+	var args []string
+	switch mode {
+	case DiffStaged:
+		args = []string{"diff", "--cached"}
+	case DiffUnstaged:
+		args = []string{"diff"}
+	default: // DiffAll
+		args = []string{"diff", "HEAD"}
 	}
 
+	// Add context argument
+	if contextLines == -1 {
+		// Full context mode - show entire file
+		args = append(args, "-U999999")
+	} else if contextLines > 0 {
+		// Custom context lines
+		args = append(args, fmt.Sprintf("-U%d", contextLines))
+	}
+	// else use default context (usually 3 lines)
+
+	// Add filepath
+	args = append(args, "--", filepath)
+
+	cmd := exec.Command("git", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("running git diff for %s: %w", filepath, err)
