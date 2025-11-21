@@ -41,6 +41,7 @@ type model struct {
 
 	// Feature toggles
 	showLineNumbers bool
+	fullContext     bool // false = focus mode (default), true = full context mode
 }
 
 // Message types for async operations
@@ -80,6 +81,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case "c":
+			// Toggle context mode (focus vs full context)
+			m.fullContext = !m.fullContext
+			// Reload current file's diff with new context
+			if len(m.files) > 0 && m.selectedFile >= 0 && m.selectedFile < len(m.files) {
+				return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext)
+			}
+			return m, nil
+
 		case "tab":
 			// Switch focus between file list and diff
 			if m.focus == focusFileList {
@@ -94,7 +104,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Navigate file list
 				if m.selectedFile < len(m.files)-1 {
 					m.selectedFile++
-					return m, loadFileDiffCmd(m.files[m.selectedFile].Path)
+					return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext)
 				}
 				return m, nil
 			}
@@ -105,7 +115,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Navigate file list
 				if m.selectedFile > 0 {
 					m.selectedFile--
-					return m, loadFileDiffCmd(m.files[m.selectedFile].Path)
+					return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext)
 				}
 				return m, nil
 			}
@@ -123,7 +133,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// Auto-load first file's diff
 			m.selectedFile = 0
-			return m, loadFileDiffCmd(m.files[0].Path)
+			return m, loadFileDiffCmd(m.files[0].Path, m.fullContext)
 		}
 		return m, nil
 
@@ -215,7 +225,7 @@ func (m model) View() string {
 	}
 
 	header := ui.TitleStyle.Render(appTitle)
-	footer := ui.RenderFooter(m.showLineNumbers)
+	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext)
 
 	if m.err != nil {
 		errorBox := ui.ErrorBox(m.err, m.winWidth)
@@ -243,9 +253,14 @@ func loadFilesCmd() tea.Cmd {
 	}
 }
 
-func loadFileDiffCmd(filepath string) tea.Cmd {
+func loadFileDiffCmd(filepath string, fullContext bool) tea.Cmd {
 	return func() tea.Msg {
-		diffOutput, err := git.GetFileDiff(filepath)
+		contextLines := 0 // default
+		if fullContext {
+			contextLines = -1 // full context
+		}
+
+		diffOutput, err := git.GetFileDiff(filepath, contextLines)
 		if err != nil {
 			return fileDiffLoadedMsg{err: err}
 		}

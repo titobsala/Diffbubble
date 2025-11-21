@@ -123,8 +123,21 @@ func GetModifiedFiles() ([]FileStat, error) {
 }
 
 // GetFileDiff returns the unified diff for a specific file.
-func GetFileDiff(filepath string) ([]byte, error) {
-	cmd := exec.Command("git", "diff", "--", filepath)
+// contextLines specifies how many context lines to show (0 for default, -1 for full file)
+func GetFileDiff(filepath string, contextLines int) ([]byte, error) {
+	var cmd *exec.Cmd
+	if contextLines == -1 {
+		// Full context mode - show entire file
+		cmd = exec.Command("git", "diff", "-U999999", "--", filepath)
+	} else if contextLines > 0 {
+		// Custom context lines
+		contextArg := fmt.Sprintf("-U%d", contextLines)
+		cmd = exec.Command("git", "diff", contextArg, "--", filepath)
+	} else {
+		// Default context (usually 3 lines)
+		cmd = exec.Command("git", "diff", "--", filepath)
+	}
+
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("running git diff for %s: %w", filepath, err)

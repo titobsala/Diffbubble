@@ -172,16 +172,22 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-// RenderFooter renders the footer with keyboard shortcuts and line number state.
-func RenderFooter(showLineNumbers bool) string {
+// RenderFooter renders the footer with keyboard shortcuts and feature states.
+func RenderFooter(showLineNumbers bool, fullContext bool) string {
 	lineNumHint := "on"
 	if !showLineNumbers {
 		lineNumHint = "off"
 	}
 
+	contextHint := "focus"
+	if fullContext {
+		contextHint = "full"
+	}
+
 	text := fmt.Sprintf(
-		"j/k: scroll/navigate • n: line numbers (%s) • q/esc: quit",
+		"j/k: scroll/navigate • n: line numbers (%s) • c: context (%s) • q/esc: quit",
 		lineNumHint,
+		contextHint,
 	)
 
 	return FooterStyle.Render(text)
