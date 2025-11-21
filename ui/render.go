@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"diffbuble/git"
-	"diffbuble/parser"
+	"diffbubble/git"
+	"diffbubble/parser"
 )
 
 type Side int

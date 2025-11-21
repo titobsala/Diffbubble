@@ -2,18 +2,23 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
+	"os"
 
-	"diffbuble/git"
-	"diffbuble/parser"
-	"diffbuble/ui"
+	"diffbubble/git"
+	"diffbubble/parser"
+	"diffbubble/ui"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-const appTitle = "Git Diff Side-by-Side"
+const (
+	appTitle = "Git Diff Side-by-Side"
+	version  = "0.1.0"
+)
 
 type focusPane int
 
@@ -289,7 +294,54 @@ func loadFileDiffCmd(filepath string, fullContext bool) tea.Cmd {
 	}
 }
 
+func printVersion() {
+	fmt.Printf("diffbubble version %s\n", version)
+}
+
+func printHelp() {
+	fmt.Println("diffbubble - A Terminal UI for side-by-side git diffs")
+	fmt.Printf("\nVersion: %s\n\n", version)
+	fmt.Println("Usage:")
+	fmt.Println("  diffbubble [flags]")
+	fmt.Println("\nFlags:")
+	fmt.Println("  -h, --help       Show this help message")
+	fmt.Println("  -v, --version    Show version information")
+	fmt.Println("\nDescription:")
+	fmt.Println("  diffbubble displays git diffs in a beautiful side-by-side format with")
+	fmt.Println("  multi-file navigation, synchronized scrolling, and line numbers.")
+	fmt.Println("\nKeyboard Controls:")
+	fmt.Println("  tab          Switch focus between file list and diff panes")
+	fmt.Println("  j/k, ↓/↑     Navigate files (when file list focused) or scroll diff")
+	fmt.Println("  n            Toggle line numbers on/off")
+	fmt.Println("  c            Toggle between focus mode and full context")
+	fmt.Println("  q, esc       Quit the application")
+	fmt.Println("\nRequires:")
+	fmt.Println("  - A git repository with changes to display")
+	fmt.Println("  - Git must be installed and available in PATH")
+}
+
 func main() {
+	var (
+		showVersion bool
+		showHelp    bool
+	)
+
+	flag.BoolVar(&showVersion, "version", false, "Show version information")
+	flag.BoolVar(&showVersion, "v", false, "Show version information (shorthand)")
+	flag.BoolVar(&showHelp, "help", false, "Show help message")
+	flag.BoolVar(&showHelp, "h", false, "Show help message (shorthand)")
+	flag.Parse()
+
+	if showVersion {
+		printVersion()
+		os.Exit(0)
+	}
+
+	if showHelp {
+		printHelp()
+		os.Exit(0)
+	}
+
 	p := tea.NewProgram(
 		model{
 			showLineNumbers: true, // Default on
@@ -300,5 +352,6 @@ func main() {
 	)
 	if _, err := p.Run(); err != nil {
 		fmt.Println("Error running program:", err)
+		os.Exit(1)
 	}
 }
