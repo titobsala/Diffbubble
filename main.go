@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"diffbubble/git"
-	"diffbubble/parser"
-	"diffbubble/ui"
+	"github.com/titobsala/Diffbubble/git"
+	"github.com/titobsala/Diffbubble/parser"
+	"github.com/titobsala/Diffbubble/ui"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
