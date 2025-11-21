@@ -22,7 +22,6 @@ func getGitDiff() string {
 	return string(out)
 }
 
-
 // ---------------------------------------------------------
 // 2. DIFF PARSING LOGIC (The "Hard" Part)
 // ---------------------------------------------------------
@@ -74,16 +73,16 @@ func parseDiff(diff string) DiffContent {
 		}
 		// Reset buckets
 
-pendingMinus = nil
-pendingPlus = nil
+		pendingMinus = nil
+		pendingPlus = nil
 	}
 
 	for _, line := range lines {
 		// Ignore git metadata headers for the view content
-		if strings.HasPrefix(line, "diff") || 
-		   strings.HasPrefix(line, "index") || 
-		   strings.HasPrefix(line, "---") || 
-		   strings.HasPrefix(line, "+++") {
+		if strings.HasPrefix(line, "diff") ||
+			strings.HasPrefix(line, "index") ||
+			strings.HasPrefix(line, "---") ||
+			strings.HasPrefix(line, "+++") {
 			continue
 		}
 
@@ -102,12 +101,12 @@ pendingPlus = nil
 			switch line[0] {
 			case '-':
 				// Removal
-			
-pendingMinus = append(pendingMinus, line)
+
+				pendingMinus = append(pendingMinus, line)
 			case '+':
 				// Addition
-			
-pendingPlus = append(pendingPlus, line)
+
+				pendingPlus = append(pendingPlus, line)
 			case ' ':
 				// Context: Context acts as a barrier that forces a flush of previous changes
 				flush()
@@ -183,7 +182,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.winWidth = msg.Width
 		m.winHeight = msg.Height
-		
+
 		// Calculate dimensions
 		headerHeight := 2
 		footerHeight := 2
@@ -198,7 +197,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Initialize viewports
 			m.leftView = viewport.New(msg.Width/2-2, msg.Height-verticalMarginHeight)
 			m.rightView = viewport.New(msg.Width/2-2, msg.Height-verticalMarginHeight)
-		
+
 			// Set content with simple syntax highlighting
 			m.leftView.SetContent(highlight(m.diffData.Left, "left"))
 			m.rightView.SetContent(highlight(m.diffData.Right, "right"))
@@ -217,7 +216,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	m.rightView, _ = m.rightView.Update(msg)
-	// We don't append the right view's command to avoid duplicate key handling 
+	// We don't append the right view's command to avoid duplicate key handling
 	// artifacts if they both processed the same key, though for viewports it's usually fine.
 	// To keep them perfectly synced, we force the Y offset to match.
 	m.rightView.YOffset = m.leftView.YOffset
@@ -239,7 +238,7 @@ func (m model) View() string {
 
 	// Join them horizontally
 	body := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
-	
+
 	// Footer
 	footer := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("Scroll with j/k/arrows • q to quit")
 
