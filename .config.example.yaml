@@ -8,8 +8,9 @@
 # CLI flags always override config file settings.
 
 # Theme: Choose your color scheme
-# Options: dark, light, high-contrast, solarized, dracula, github
+# Options: dark, light, high-contrast, solarized, dracula, github, catppuccin, tokyo-night, one-dark
 # Default: dark
+# You can also cycle through themes interactively by pressing 't' while the app is running
 theme: dark
 
 # Line Numbers: Show line numbers by default

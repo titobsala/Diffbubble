@@ -67,17 +67,35 @@ The application follows a clean separation of concerns with three main layers an
 - `ui/render.go`: Converts parsed diff rows into styled strings for viewports
   - `RenderSide(rows, side, showLineNumbers)`: Renders one side (left or right) with optional line numbers
   - `RenderFileList(files, selectedIdx)`: Renders sidebar file list with stats and status indicators
-  - `RenderFooter(showLineNumbers)`: Renders footer with keyboard hints and line number state
+  - `RenderFooter(showLineNumbers, fullContext, focusOnFileList, termWidth)`: Renders footer with keyboard hints
+  - `ErrorBox(err, width)`: Renders helpful error messages with context-specific suggestions
   - Dynamic line number width calculation based on max line number
   - Header rendering with separators
-- `ui/styles.go`: Centralized lipgloss styles for colors and formatting
-  - Addition lines: green (#43BF6D)
-  - Deletion lines: red (#E05252)
-  - Modified files: yellow (#F5C842)
-  - Headers: gray with separators
-  - File list: sidebar styles with selection highlighting
+- `ui/styles.go`: Dynamic lipgloss styles that update based on current theme
+  - All styles are variables updated by `updateStyles()` function
+  - Styles include: TitleStyle, AddStyle, DelStyle, BorderStyleFocused, etc.
+- `ui/themes.go`: Theme system (v0.3.0+)
+  - `Theme` struct defines all color properties
+  - 9 built-in themes: dark, light, high-contrast, solarized, dracula, github, catppuccin, tokyo-night, one-dark
+  - `SetTheme(name)`: Sets active theme and updates all styles
+  - `GetTheme()`: Returns current theme
+  - `ListThemes()`: Returns all available theme names
+  - `ValidateTheme(name)`: Checks if theme exists
 
-### 4. Main Application (`main.go`)
+### 4. Config Layer (`config/`)
+- `config/config.go`: Configuration file support (v0.3.0+)
+  - `Config` struct with YAML tags for persistence
+  - `DefaultConfig()`: Returns default configuration values
+  - `Load()`: Loads and merges user and repo config files
+  - `Save()`: Saves configuration to user config file
+  - `Validate()`: Validates config values
+  - **Config locations**:
+    - User config: `~/.config/diffbubble/config.yaml`
+    - Repository config: `.diffbubble.yml` in git repo root
+  - **Priority chain**: CLI flags > repo config > user config > defaults
+  - **Supported settings**: theme, line_numbers, context_mode, diff_mode, key_bindings
+
+### 5. Main Application (`main.go`)
 - Implements Bubble Tea's Model-View-Update pattern with 3-column layout
 - Model state:
   - **File list**: `[]git.FileStat` stores all modified files, `selectedFile` tracks current selection
@@ -87,15 +105,21 @@ The application follows a clean separation of concerns with three main layers an
   - **Feature toggles**:
     - `showLineNumbers bool` for line number display (default: true)
     - `fullContext bool` for context mode (false = focus mode, true = full context)
+  - **Theme state** (v0.3.0+):
+    - `currentThemeIdx int` tracks current theme index for 't' key cycling
+    - `themeChangeMsg string` displays theme change notification
+    - `themeChangeTicks int` controls how long the notification is shown
   - **CLI options**:
     - `diffMode git.DiffMode` for staged/unstaged/all changes
     - `initialFile string` for pre-selecting a file on startup
 - Update logic:
   - **Async loading**: `filesLoadedMsg` and `fileDiffLoadedMsg` for non-blocking git operations
+  - **Empty state handling**: Provides helpful context-specific messages when no files found (v0.3.0+)
   - **File navigation**: j/k keys navigate file list when focused, load new diff on selection
   - **Initial file selection**: If `--file` flag provided, searches for and selects that file on startup
   - **Line number toggle**: 'n' key toggles line numbers and re-renders diff
   - **Context toggle**: 'c' key toggles between focus mode and full context
+  - **Theme cycling**: 't' key cycles through all themes interactively with notification (v0.3.0+)
   - **Focus switching**: Tab key switches between file list and diff panes
   - **Synchronized scrolling**: Diff panes scroll together via `YOffset` syncing
   - Window resize handling for all three panes
@@ -105,12 +129,15 @@ The application follows a clean separation of concerns with three main layers an
   - Dynamic width calculations based on terminal size
   - Header, body, and footer sections
   - Error state handling
-- CLI Flags (v0.2.0+):
+- CLI Flags:
   - `--help, -h`: Show help message
   - `--version, -v`: Show version information
-  - `--file=<filename>`: Open with specific file pre-selected
-  - `--staged`: Show only staged changes (git diff --cached)
-  - `--unstaged`: Show only unstaged changes
+  - `--file=<filename>`: Open with specific file pre-selected (v0.2.0+)
+  - `--staged`: Show only staged changes - git diff --cached (v0.2.0+)
+  - `--unstaged`: Show only unstaged changes (v0.2.0+)
+  - `--theme=<name>`: Set color theme (v0.3.0+)
+  - `--list-themes`: List all available themes (v0.3.0+)
+  - `--show-theme-colors <name>`: Preview theme colors with ANSI codes (v0.3.0+)
 
 ## Key Implementation Details
 
@@ -148,11 +175,38 @@ Line numbers increment separately for left and right sides:
 - Headers don't have line numbers
 - Can be toggled on/off with 'n' key
 
+### Theme System (v0.3.0+)
+The theme system provides customizable color schemes:
+- **Architecture**: Theme struct contains all color definitions (hex strings)
+- **Dynamic styles**: `updateStyles()` function recreates all lipgloss styles when theme changes
+- **9 built-in themes**: dark (default), light, high-contrast, solarized, dracula, github, catppuccin, tokyo-night, one-dark
+- **Interactive cycling**: 't' key cycles through themes with a brief notification message
+- **CLI preview**: `--show-theme-colors` uses ANSI 24-bit color codes (\033[48;2;R;G;Bm) to preview colors
+- **Configuration**: Theme can be set in config file or via --theme flag
+- **Real-time updates**: All UI elements (diffs, borders, file list) update immediately when theme changes
+
+### Configuration System (v0.3.0+)
+YAML-based configuration with priority chain:
+- **Locations**: User config (`~/.config/diffbubble/config.yaml`) and repo config (`.diffbubble.yml`)
+- **Priority**: CLI flags > repo config > user config > defaults
+- **Settings**: theme, line_numbers, context_mode, diff_mode, key_bindings
+- **Merge strategy**: Repo config overrides user config, CLI flags override everything
+- **Validation**: `Validate()` ensures all values are valid, falls back to defaults if not
+- **Example file**: `.config.example.yaml` provides comprehensive documentation
+
+### Empty State Handling (v0.3.0+)
+Context-specific error messages when no files are found:
+- **Staged mode**: Suggests running `git add` or using --unstaged
+- **Unstaged mode**: Suggests using --staged or making changes
+- **All mode**: Suggests checking working directory or repository status
+- **Detection**: Checks if file list is empty with no error in `filesLoadedMsg` handler
+
 ## Dependencies
 
 - `github.com/charmbracelet/bubbletea`: TUI framework (Elm Architecture)
 - `github.com/charmbracelet/bubbles`: Reusable TUI components (viewport)
 - `github.com/charmbracelet/lipgloss`: Terminal styling and layout
+- `gopkg.in/yaml.v3`: YAML configuration file parsing (v0.3.0+)
 
 ## Keyboard Controls
 
@@ -160,6 +214,8 @@ Line numbers increment separately for left and right sides:
 - `q`, `esc`, `ctrl+c`: Quit application
 - `tab`: Switch focus between file list and diff panes
 - `n`: Toggle line numbers on/off
+- `c`: Toggle between focus mode and full context
+- `t`: Cycle through themes interactively (v0.3.0+)
 
 ### When File List is Focused
 - `j`, `↓`: Select next file (loads its diff)
@@ -258,56 +314,30 @@ go fmt ./...
 - ✅ CI/CD with GitHub Actions
 - ✅ Multi-platform binary builds
 
-### 🎯 High Priority (v0.3.0)
+#### v0.3.0
+- ✅ **Theme System** 🎨
+  - 9 built-in themes: dark, light, high-contrast, solarized, dracula, github, catppuccin, tokyo-night, one-dark
+  - `--theme=<name>` CLI flag to set theme
+  - `--list-themes` CLI flag to list all themes
+  - `--show-theme-colors <name>` CLI flag to preview theme colors
+  - 't' key to cycle through themes interactively
+  - Real-time theme switching with notification
+  - Dynamic style updates for all UI elements
+- ✅ **Configuration File Support** ⚙️
+  - YAML-based config files
+  - User config: `~/.config/diffbubble/config.yaml`
+  - Repository config: `.diffbubble.yml` in repo root
+  - Settings: theme, line_numbers, context_mode, diff_mode, key_bindings
+  - Priority chain: CLI flags > repo config > user config > defaults
+  - Example config file: `.config.example.yaml`
+- ✅ **Empty State Handling**
+  - Context-specific error messages for no files scenarios
+  - Helpful suggestions based on diff mode (staged/unstaged/all)
+  - Better UX when no changes are found
 
-#### 1. Theme System 🎨
-**Priority**: HIGH | **Effort**: Medium | **User Value**: Very High
+### 🎯 High Priority (v0.3.1+)
 
-- Implement `--theme=<name>` CLI flag
-- Built-in themes:
-  - `dark` (current/default)
-  - `light` - Light background with dark text
-  - `high-contrast` - Maximum contrast for accessibility
-  - `solarized` - Popular solarized color scheme
-  - `dracula` - Dark theme with purple accents
-  - `github` - GitHub-style diff colors
-- Theme configuration structure in code
-- Syntax highlighting integration for different file types
-- Custom theme support via config file (future)
-
-**Implementation Notes**:
-- Add `ui/themes.go` with theme definitions
-- Update `ui/styles.go` to use theme colors
-- Add theme parameter to render functions
-- Store current theme in model state
-
-#### 2. Configuration File Support ⚙️
-**Priority**: HIGH | **Effort**: Medium | **User Value**: High
-
-- Config file location: `~/.config/diffbubble/config.yaml`
-- Per-repository config: `.diffbubble.yml` in repo root
-- Configurable settings:
-  - Default theme
-  - Line numbers (on/off by default)
-  - Context mode (focus/full by default)
-  - Diff mode (all/staged/unstaged)
-  - Custom key bindings
-  - Custom colors (advanced)
-- Config priority: CLI flags > repo config > user config > defaults
-
-**Example config.yaml**:
-```yaml
-theme: dracula
-line_numbers: true
-context_mode: focus
-diff_mode: all
-key_bindings:
-  search: "/"
-  next_file: "j"
-  prev_file: "k"
-```
-
-#### 3. Search Functionality 🔍
+#### 1. Search Functionality 🔍
 **Priority**: HIGH | **Effort**: Medium | **User Value**: Very High
 
 - Press `/` to enter search mode

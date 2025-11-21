@@ -40,7 +40,12 @@ func RenderSide(rows []parser.DiffRow, side Side, showLineNumbers bool) string {
 
 // ErrorBox renders a stylized error message that can be embedded inside the layout.
 func ErrorBox(err error, width int) string {
-	message := fmt.Sprintf("Unable to load git diff.\n\n%s", err)
+	// Use error message as-is if it contains suggestions (multi-line with bullets)
+	message := err.Error()
+	if !strings.Contains(message, "•") {
+		// For generic errors, add prefix
+		message = fmt.Sprintf("Unable to load git diff.\n\n%s", err)
+	}
 
 	maxWidth := width - 6
 	if maxWidth < 20 {
@@ -201,7 +206,7 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, 
 	if termWidth < 120 {
 		// Shortened version for narrow terminals
 		text = fmt.Sprintf(
-			"tab:pane(%s) • j/k:nav • n:nums(%s) • c:ctx(%s) • q:quit",
+			"tab:pane(%s) • j/k:nav • n:nums(%s) • c:ctx(%s) • t:theme • q:quit",
 			focusHint,
 			lineNumHint,
 			contextHint,
@@ -209,7 +214,7 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, 
 	} else {
 		// Full version for wider terminals
 		text = fmt.Sprintf(
-			"tab: switch pane (%s) • j/k: scroll/navigate • n: line numbers (%s) • c: context (%s) • q/esc: quit",
+			"tab: switch pane (%s) • j/k: scroll/navigate • n: line numbers (%s) • c: context (%s) • t: cycle theme • q/esc: quit",
 			focusHint,
 			lineNumHint,
 			contextHint,

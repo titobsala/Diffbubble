@@ -38,6 +38,9 @@ var themes = map[string]Theme{
 	"solarized":     SolarizedTheme(),
 	"dracula":       DraculaTheme(),
 	"github":        GitHubTheme(),
+	"catppuccin":    CatppuccinTheme(),
+	"tokyo-night":   TokyoNightTheme(),
+	"one-dark":      OneDarkTheme(),
 }
 
 // SetTheme sets the active theme and updates all styles
@@ -57,7 +60,7 @@ func GetTheme() Theme {
 
 // ListThemes returns all available theme names
 func ListThemes() []string {
-	return []string{"dark", "light", "high-contrast", "solarized", "dracula", "github"}
+	return []string{"dark", "light", "high-contrast", "solarized", "dracula", "github", "catppuccin", "tokyo-night", "one-dark"}
 }
 
 // ValidateTheme checks if a theme name is valid
@@ -237,6 +240,93 @@ func GitHubTheme() Theme {
 		// General
 		Background: "#FFFFFF",
 		Foreground: "#24292F",
+	}
+}
+
+// CatppuccinTheme - Catppuccin Mocha color scheme
+func CatppuccinTheme() Theme {
+	return Theme{
+		Name: "catppuccin",
+
+		// Diff colors - Catppuccin Mocha palette
+		AdditionBg: "#1E2D2F", // base with green tint
+		AdditionFg: "#A6E3A1", // green
+		DeletionBg: "#2D1E1E", // base with red tint
+		DeletionFg: "#F38BA8", // red
+		ContextFg:  "#CDD6F4", // text
+		HeaderFg:   "#6C7086", // overlay0
+
+		// UI colors
+		BorderColor:        "#45475A", // surface1
+		FocusedBorderColor: "#CBA6F7", // mauve
+		TitleFg:            "#CDD6F4", // text
+
+		// File list colors
+		ModifiedFg: "#F9E2AF", // yellow
+		AddedFg:    "#A6E3A1", // green
+		DeletedFg:  "#F38BA8", // red
+
+		// General
+		Background: "#1E1E2E", // base
+		Foreground: "#CDD6F4", // text
+	}
+}
+
+// TokyoNightTheme - Tokyo Night color scheme
+func TokyoNightTheme() Theme {
+	return Theme{
+		Name: "tokyo-night",
+
+		// Diff colors - Tokyo Night palette
+		AdditionBg: "#1A2B32", // dark with green tint
+		AdditionFg: "#9ECE6A", // green
+		DeletionBg: "#2B1A1A", // dark with red tint
+		DeletionFg: "#F7768E", // red
+		ContextFg:  "#A9B1D6", // foreground
+		HeaderFg:   "#565F89", // comment
+
+		// UI colors
+		BorderColor:        "#3B4261", // border
+		FocusedBorderColor: "#BB9AF7", // purple
+		TitleFg:            "#C0CAF5", // foreground bright
+
+		// File list colors
+		ModifiedFg: "#E0AF68", // yellow
+		AddedFg:    "#9ECE6A", // green
+		DeletedFg:  "#F7768E", // red
+
+		// General
+		Background: "#1A1B26", // background
+		Foreground: "#A9B1D6", // foreground
+	}
+}
+
+// OneDarkTheme - Atom's One Dark color scheme
+func OneDarkTheme() Theme {
+	return Theme{
+		Name: "one-dark",
+
+		// Diff colors - One Dark palette
+		AdditionBg: "#1C2B1F", // dark with green tint
+		AdditionFg: "#98C379", // green
+		DeletionBg: "#2B1C1C", // dark with red tint
+		DeletionFg: "#E06C75", // red
+		ContextFg:  "#ABB2BF", // mono-1
+		HeaderFg:   "#5C6370", // mono-3
+
+		// UI colors
+		BorderColor:        "#3E4451", // gutter
+		FocusedBorderColor: "#C678DD", // purple
+		TitleFg:            "#DCDFE4", // mono-0
+
+		// File list colors
+		ModifiedFg: "#E5C07B", // yellow
+		AddedFg:    "#98C379", // green
+		DeletedFg:  "#E06C75", // red
+
+		// General
+		Background: "#282C34", // background
+		Foreground: "#ABB2BF", // mono-1
 	}
 }
 
