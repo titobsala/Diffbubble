@@ -1,4 +1,4 @@
-module diffbuble
+module diffbubble
 
 go 1.25.0
 

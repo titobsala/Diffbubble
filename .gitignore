@@ -43,6 +43,7 @@ Thumbs.db
 dist/
 build/
 diffbuble
+diffbubble
 
 # Environment files
 .env

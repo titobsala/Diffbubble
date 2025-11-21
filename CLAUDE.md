@@ -17,10 +17,10 @@ go mod tidy
 go run main.go
 
 # Build binary
-go build -o diffbuble main.go
+go build -o diffbubble main.go
 
 # Run the built binary
-./diffbuble
+./diffbubble
 ```
 
 ### Testing
