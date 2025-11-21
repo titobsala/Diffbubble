@@ -101,15 +101,15 @@ index 88a2s..d1234 100644
  
  func main() {
 @@ -10,4 +10,8 @@
--	fmt.Println("Hello World")
--	fmt.Println("This line is removed")
-+	log.Println("Hello Charm")
-+	log.Println("This is a new feature")
-+	log.Println("Added extra logging")
-+	log.Println("More lines added than removed")
- 	
- 	// Context line that should align
- 	return
+-    fmt.Println("Hello World")
+-    fmt.Println("This line is removed")
++    log.Println("Hello Charm")
++    log.Println("This is a new feature")
++    log.Println("Added extra logging")
++    log.Println("More lines added than removed")
+ 
+     // Context line that should align
+     return
 }`
 
 // ---------------------------------------------------------
@@ -156,8 +156,9 @@ func parseDiff(diff string) DiffContent {
 			}
 		}
 		// Reset buckets
-		pendingMinus = nil
-		pendingPlus = nil
+	
+pendingMinus = nil
+pendingPlus = nil
 	}
 
 	for _, line := range lines {
@@ -184,10 +185,12 @@ func parseDiff(diff string) DiffContent {
 			switch line[0] {
 			case '-':
 				// Removal
-				pendingMinus = append(pendingMinus, line)
+			
+pendingMinus = append(pendingMinus, line)
 			case '+':
 				// Addition
-				pendingPlus = append(pendingPlus, line)
+			
+pendingPlus = append(pendingPlus, line)
 			case ' ':
 				// Context: Context acts as a barrier that forces a flush of previous changes
 				flush()
@@ -217,7 +220,7 @@ var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FAFAFA")).
-			Background(lipgloss.Color("#7D56F4")).
+			Background(lipgloss.Color("#7D56F4")),
 			Padding(0, 1).
 			MarginBottom(1)
 
@@ -356,3 +359,5 @@ func main() {
 		fmt.Println("Error running program:", err)
 	}
 }
+
+This is a new line.
