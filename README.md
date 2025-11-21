@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go)](https://go.dev)
+[![CI](https://github.com/titobsala/Diffbubble/workflows/CI/badge.svg)](https://github.com/titobsala/Diffbubble/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/titobsala/Diffbubble)](https://github.com/titobsala/Diffbubble/releases)
 
 A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, and beautiful color-coded statistics.
 
@@ -22,12 +24,35 @@ A Terminal User Interface (TUI) application written in Go to display a side-by-s
 
 ## Installation
 
-### Option 1: Install with Go (Recommended)
+### Option 1: Download Binary (Easiest)
+
+Download the latest pre-built binary for your platform from the [Releases page](https://github.com/titobsala/Diffbubble/releases/latest).
+
+**Supported platforms:**
+- Linux (x86_64, ARM64)
+- macOS (x86_64, ARM64/Apple Silicon)
+- Windows (x86_64)
+
+After downloading:
+```sh
+# Linux/macOS: Make it executable and move to PATH
+chmod +x diffbubble
+sudo mv diffbubble /usr/local/bin/
+
+# Windows: Add the directory to your PATH
+```
+
+### Option 2: Install with Go
 
 If you have Go installed, you can install diffbubble directly:
 
 ```sh
 go install github.com/titobsala/Diffbubble@latest
+```
+
+**Note:** Make sure `$GOPATH/bin` (typically `~/go/bin`) is in your PATH. Add this to your shell config:
+```sh
+export PATH="$PATH:$HOME/go/bin"
 ```
 
 Then run it from anywhere:
@@ -36,7 +61,7 @@ Then run it from anywhere:
 diffbubble
 ```
 
-### Option 2: Build from Source
+### Option 3: Build from Source
 
 1.  **Prerequisites:** Ensure you have [Go](https://go.dev/doc/install) (1.25+) and [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) installed.
 2.  **Clone the repository:**
@@ -57,7 +82,7 @@ diffbubble
     ./diffbubble
     ```
 
-### Option 3: Run without installing
+### Option 4: Run without installing
 
 For development or quick testing:
 
@@ -69,22 +94,43 @@ go run main.go
 
 ## Usage
 
+### Basic Usage
+
 Navigate to any git repository with changes and run:
 
 ```sh
 diffbubble
 ```
 
-To see available options:
+### CLI Options
 
 ```sh
-diffbubble --help
+diffbubble [flags]
 ```
 
-To check the version:
+**Available flags:**
+- `--help, -h` - Show help message
+- `--version, -v` - Show version information
+- `--file=<filename>` - Open with specific file selected
+- `--staged` - Show only staged changes (git diff --cached)
+- `--unstaged` - Show only unstaged changes
 
+**Examples:**
 ```sh
-diffbubble --version
+# Show all changes (staged + unstaged)
+diffbubble
+
+# Show only staged changes
+diffbubble --staged
+
+# Show only unstaged changes
+diffbubble --unstaged
+
+# Open with README.md selected
+diffbubble --file=README.md
+
+# Combine flags
+diffbubble --staged --file=main.go
 ```
 
 ## Controls
