@@ -44,6 +44,10 @@ func parseDiff(diff string) DiffContent {
 	var pendingMinus []string
 	var pendingPlus []string
 
+	// Line number counters for each side
+	leftLineNum := 1
+	rightLineNum := 1
+
 	// Helper to flush pending changes to the main buffers with alignment
 	flush := func() {
 		maxLen := len(pendingMinus)
@@ -54,20 +58,22 @@ func parseDiff(diff string) DiffContent {
 		for i := 0; i < maxLen; i++ {
 			// Left Side (Old)
 			if i < len(pendingMinus) {
-				leftBuf.WriteString(pendingMinus[i] + "\n")
+				leftBuf.WriteString(fmt.Sprintf("%4d %s\n", leftLineNum, pendingMinus[i]))
+				leftLineNum++
 			} else {
 				leftBuf.WriteString("\n") // Padding
 			}
 
 			// Right Side (New)
 			if i < len(pendingPlus) {
-				rightBuf.WriteString(pendingPlus[i] + "\n")
+				rightBuf.WriteString(fmt.Sprintf("%4d %s\n", rightLineNum, pendingPlus[i]))
+				rightLineNum++
 			} else {
 				rightBuf.WriteString("\n") // Padding
 			}
 		}
 		// Reset buckets
-	
+
 pendingMinus = nil
 pendingPlus = nil
 	}
@@ -86,8 +92,8 @@ pendingPlus = nil
 			flush()
 			// You could render the hunk header here if you wanted
 			separator := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(strings.Repeat("─", 30))
-			leftBuf.WriteString(fmt.Sprintf("%s\n%s\n", separator, line))
-			rightBuf.WriteString(fmt.Sprintf("%s\n%s\n", separator, line))
+			leftBuf.WriteString(fmt.Sprintf("%s\n    %s\n", separator, line))
+			rightBuf.WriteString(fmt.Sprintf("%s\n    %s\n", separator, line))
 			continue
 		}
 
@@ -105,14 +111,18 @@ pendingPlus = append(pendingPlus, line)
 			case ' ':
 				// Context: Context acts as a barrier that forces a flush of previous changes
 				flush()
-				leftBuf.WriteString(line + "\n")
-				rightBuf.WriteString(line + "\n")
+				leftBuf.WriteString(fmt.Sprintf("%4d %s\n", leftLineNum, line))
+				rightBuf.WriteString(fmt.Sprintf("%4d %s\n", rightLineNum, line))
+				leftLineNum++
+				rightLineNum++
 			}
 		} else {
 			// Empty lines in diff are usually context
 			flush()
-			leftBuf.WriteString("\n")
-			rightBuf.WriteString("\n")
+			leftBuf.WriteString(fmt.Sprintf("%4d \n", leftLineNum))
+			rightBuf.WriteString(fmt.Sprintf("%4d \n", rightLineNum))
+			leftLineNum++
+			rightLineNum++
 		}
 	}
 	flush() // Flush any remaining changes at EOF
@@ -236,7 +246,7 @@ func (m model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Top, header, body, footer)
 }
 
-// highlight applies simple color based on the first character of the line
+// highlight applies simple color based on the diff marker character
 func highlight(content, side string) string {
 	lines := strings.Split(content, "\n")
 	var sb strings.Builder
@@ -245,14 +255,17 @@ func highlight(content, side string) string {
 			sb.WriteString("\n")
 			continue
 		}
-		
-		// Check the first char to determine color
-		// Note: The parser preserved the +/- signs so we can check them here
-		firstChar := line[0]
-		
-		if firstChar == '-' && side == "left" {
+
+		// Line format: "NNNN [+- ]content" where NNNN is 4-digit line number
+		// Check the character after line number (position 5) to determine color
+		var markerChar byte = ' '
+		if len(line) >= 6 {
+			markerChar = line[5] // Position after "NNNN "
+		}
+
+		if markerChar == '-' && side == "left" {
 			sb.WriteString(delStyle.Render(line) + "\n")
-		} else if firstChar == '+' && side == "right" {
+		} else if markerChar == '+' && side == "right" {
 			sb.WriteString(addStyle.Render(line) + "\n")
 		} else {
 			sb.WriteString(line + "\n")
