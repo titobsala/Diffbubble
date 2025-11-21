@@ -13,9 +13,9 @@ import (
 type DiffMode int
 
 const (
-	DiffAll DiffMode = iota // Both staged and unstaged (default)
-	DiffStaged              // Only staged changes (--cached)
-	DiffUnstaged            // Only unstaged changes
+	DiffAll      DiffMode = iota // Both staged and unstaged (default)
+	DiffStaged                   // Only staged changes (--cached)
+	DiffUnstaged                 // Only unstaged changes
 )
 
 // FileStatus represents the status of a modified file.

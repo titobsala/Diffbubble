@@ -183,8 +183,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Calculate dimensions: 20-40-40 split
 		// Increased margin to account for header, footer, borders, and potential text wrapping
-		headerHeight := 3  // Title + margin + buffer
-		footerHeight := 3  // Footer can wrap to 2-3 lines in narrow terminals
+		headerHeight := 3 // Title + margin + buffer
+		footerHeight := 3 // Footer can wrap to 2-3 lines in narrow terminals
 		verticalMarginHeight := headerHeight + footerHeight
 
 		// 20% for sidebar, 40% for each diff pane
