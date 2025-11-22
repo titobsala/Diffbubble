@@ -1,0 +1,59 @@
+# Diffbubble Configuration Example
+# Copy this file to ~/.config/diffbubble/config.yaml to use it
+#
+# You can also create a repository-specific config at .diffbubble.yml
+# in your git repository root. Repository config overrides user config.
+#
+# All settings are optional. If not specified, defaults are used.
+# CLI flags always override config file settings.
+
+# Theme: Choose your color scheme
+# Options: dark, light, high-contrast, solarized, dracula, github, catppuccin, tokyo-night, one-dark
+# Default: dark
+# You can also cycle through themes interactively by pressing 't' while the app is running
+theme: dark
+
+# Line Numbers: Show line numbers by default
+# Options: true, false
+# Default: true
+line_numbers: true
+
+# Context Mode: How much context to show around changes
+# Options: "focus" (only changes), "full" (entire file)
+# Default: focus
+context_mode: focus
+
+# Diff Mode: Which changes to show by default
+# Options: "all" (staged + unstaged), "staged", "unstaged"
+# Default: all
+diff_mode: all
+
+# Key Bindings: Customize keyboard shortcuts (optional)
+# Comment out to use defaults
+# key_bindings:
+#   search: "/"              # Open search
+#   next_file: "j"           # Navigate to next file
+#   prev_file: "k"           # Navigate to previous file
+#   toggle_line_numbers: "n" # Toggle line numbers
+#   toggle_context: "c"      # Toggle context mode
+#   quit: "q"                # Quit application
+
+# -----------------------------------------------
+# Example Configurations:
+# -----------------------------------------------
+
+# For a light theme setup:
+# theme: light
+# line_numbers: true
+# context_mode: focus
+
+# For code review (full context):
+# theme: github
+# context_mode: full
+# diff_mode: all
+
+# For minimal, focused view:
+# theme: high-contrast
+# line_numbers: false
+# context_mode: focus
+# diff_mode: unstaged

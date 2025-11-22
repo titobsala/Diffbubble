@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/titobsala/Diffbubble/config"
 	"github.com/titobsala/Diffbubble/git"
 	"github.com/titobsala/Diffbubble/parser"
 	"github.com/titobsala/Diffbubble/ui"
@@ -17,7 +19,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.1.0"
+	version  = "0.3.0"
 )
 
 type focusPane int
@@ -45,10 +47,13 @@ type model struct {
 	rightView   viewport.Model
 
 	// Feature toggles
-	showLineNumbers bool
-	fullContext     bool         // false = focus mode (default), true = full context mode
-	diffMode        git.DiffMode // Which changes to show (all, staged, unstaged)
-	initialFile     string       // File to pre-select on startup (if specified)
+	showLineNumbers  bool
+	fullContext      bool         // false = focus mode (default), true = full context mode
+	diffMode         git.DiffMode // Which changes to show (all, staged, unstaged)
+	initialFile      string       // File to pre-select on startup (if specified)
+	currentThemeIdx  int          // Current theme index for 't' key cycling
+	themeChangeMsg   string       // Brief message shown when theme changes
+	themeChangeTicks int          // Counter to clear theme change message
 }
 
 // Message types for async operations
@@ -97,6 +102,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case "t":
+			// Cycle through themes
+			themes := ui.ListThemes()
+			m.currentThemeIdx = (m.currentThemeIdx + 1) % len(themes)
+			newTheme := themes[m.currentThemeIdx]
+			ui.SetTheme(newTheme)
+
+			// Show theme change message
+			m.themeChangeMsg = fmt.Sprintf("Theme: %s", newTheme)
+			m.themeChangeTicks = 3 // Show for 3 ticks
+
+			// Re-render current diff with new theme
+			if len(m.currentRows) > 0 {
+				m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers))
+				m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers))
+			}
+			if len(m.files) > 0 && m.ready {
+				m.fileListView.SetContent(ui.RenderFileList(m.files, m.selectedFile))
+			}
+			return m, nil
+
 		case "tab":
 			// Switch focus between file list and diff
 			if m.focus == focusFileList {
@@ -132,6 +158,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case filesLoadedMsg:
 		m.files = msg.files
 		m.err = msg.err
+
+		if m.err == nil && len(m.files) == 0 {
+			// No files found - provide helpful context-specific message
+			switch m.diffMode {
+			case git.DiffStaged:
+				m.err = fmt.Errorf("No staged changes found.\n\nTry one of the following:\n  • Run 'git add <file>' to stage some changes\n  • Use --unstaged to see unstaged changes\n  • Remove --staged flag to see all changes")
+			case git.DiffUnstaged:
+				m.err = fmt.Errorf("No unstaged changes found.\n\nTry one of the following:\n  • Use --staged to see staged changes\n  • Remove --unstaged flag to see all changes\n  • Make some changes to your working directory")
+			default:
+				m.err = fmt.Errorf("No changes found in the repository.\n\nMake sure you have:\n  • Modified some files in your working directory\n  • Staged some changes with 'git add'\n  • Checked that you're in a git repository")
+			}
+		}
 
 		if m.err == nil && len(m.files) > 0 {
 			// Update file list viewport content
@@ -235,6 +273,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rightView.YOffset = m.leftView.YOffset
 	}
 
+	// Decrement theme change message counter
+	if m.themeChangeTicks > 0 {
+		m.themeChangeTicks--
+		if m.themeChangeTicks == 0 {
+			m.themeChangeMsg = ""
+		}
+	}
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -244,6 +290,16 @@ func (m model) View() string {
 	}
 
 	header := ui.TitleStyle.Render(appTitle)
+
+	// Add theme change notification if active
+	if m.themeChangeMsg != "" {
+		themeMsg := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#F9E2AF")).
+			Bold(true).
+			Render(" " + m.themeChangeMsg)
+		header = lipgloss.JoinHorizontal(lipgloss.Center, header, themeMsg)
+	}
+
 	focusOnFileList := m.focus == focusFileList
 	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext, focusOnFileList, m.winWidth)
 
@@ -317,37 +373,134 @@ func printHelp() {
 	fmt.Println("Usage:")
 	fmt.Println("  diffbubble [flags]")
 	fmt.Println("\nFlags:")
-	fmt.Println("  -h, --help           Show this help message")
-	fmt.Println("  -v, --version        Show version information")
-	fmt.Println("  --file=<filename>    Open with specific file selected")
-	fmt.Println("  --staged             Show only staged changes (git diff --cached)")
-	fmt.Println("  --unstaged           Show only unstaged changes (default behavior)")
+	fmt.Println("  -h, --help                    Show this help message")
+	fmt.Println("  -v, --version                 Show version information")
+	fmt.Println("  --file=<filename>             Open with specific file selected")
+	fmt.Println("  --staged                      Show only staged changes (git diff --cached)")
+	fmt.Println("  --unstaged                    Show only unstaged changes")
+	fmt.Println("  --theme=<name>                Color theme (default: dark)")
+	fmt.Println("  --list-themes                 List all available themes")
+	fmt.Println("  --show-theme-colors <name>    Preview colors for a specific theme")
+	fmt.Println("\nAvailable Themes:")
+	fmt.Println("  dark, light, high-contrast, solarized, dracula, github,")
+	fmt.Println("  catppuccin, tokyo-night, one-dark")
 	fmt.Println("\nDescription:")
 	fmt.Println("  diffbubble displays git diffs in a beautiful side-by-side format with")
-	fmt.Println("  multi-file navigation, synchronized scrolling, and line numbers.")
+	fmt.Println("  multi-file navigation, synchronized scrolling, and customizable themes.")
 	fmt.Println("\nExamples:")
-	fmt.Println("  diffbubble                      # Show all changes (staged + unstaged)")
-	fmt.Println("  diffbubble --staged             # Show only staged changes")
-	fmt.Println("  diffbubble --unstaged           # Show only unstaged changes")
-	fmt.Println("  diffbubble --file=README.md     # Open with README.md selected")
+	fmt.Println("  diffbubble                               # Show all changes")
+	fmt.Println("  diffbubble --staged                      # Show only staged changes")
+	fmt.Println("  diffbubble --unstaged                    # Show only unstaged changes")
+	fmt.Println("  diffbubble --file=README.md              # Open with README.md selected")
+	fmt.Println("  diffbubble --theme=catppuccin            # Use Catppuccin theme")
+	fmt.Println("  diffbubble --theme=tokyo-night --staged  # Tokyo Night theme, staged only")
+	fmt.Println("  diffbubble --list-themes                 # List all available themes")
+	fmt.Println("  diffbubble --show-theme-colors dracula   # Preview Dracula theme colors")
 	fmt.Println("\nKeyboard Controls:")
 	fmt.Println("  tab          Switch focus between file list and diff panes")
 	fmt.Println("  j/k, ↓/↑     Navigate files (when file list focused) or scroll diff")
 	fmt.Println("  n            Toggle line numbers on/off")
 	fmt.Println("  c            Toggle between focus mode and full context")
+	fmt.Println("  t            Cycle through themes interactively")
 	fmt.Println("  q, esc       Quit the application")
 	fmt.Println("\nRequires:")
 	fmt.Println("  - A git repository with changes to display")
 	fmt.Println("  - Git must be installed and available in PATH")
 }
 
+func printThemeList() {
+	fmt.Println("Available themes:")
+	fmt.Println()
+	themes := ui.ListThemes()
+	for _, theme := range themes {
+		fmt.Printf("  • %s\n", theme)
+	}
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  diffbubble --theme=<name>")
+	fmt.Println("  diffbubble --show-theme-colors <name>  # Preview theme colors")
+}
+
+func printThemeColors(themeName string) {
+	if !ui.ValidateTheme(themeName) {
+		fmt.Printf("Error: Unknown theme '%s'\n", themeName)
+		fmt.Printf("Available themes: %v\n", ui.ListThemes())
+		os.Exit(1)
+	}
+
+	ui.SetTheme(themeName)
+	theme := ui.GetTheme()
+
+	fmt.Printf("Theme: %s\n", theme.Name)
+	fmt.Println(strings.Repeat("─", 50))
+	fmt.Println()
+
+	// Helper function to display color with ANSI codes
+	colorBox := func(color, name string) {
+		// Convert hex to ANSI 24-bit color
+		r, g, b := hexToRGB(color)
+		fmt.Printf("  %-20s ", name+":")
+		fmt.Printf("\033[48;2;%d;%d;%dm   \033[0m", r, g, b) // Background box
+		fmt.Printf("  %s\n", color)
+	}
+
+	fmt.Println("Diff Colors:")
+	colorBox(theme.AdditionFg, "  Addition (text)")
+	colorBox(theme.AdditionBg, "  Addition (bg)")
+	colorBox(theme.DeletionFg, "  Deletion (text)")
+	colorBox(theme.DeletionBg, "  Deletion (bg)")
+	colorBox(theme.ContextFg, "  Context")
+	colorBox(theme.HeaderFg, "  Headers")
+	fmt.Println()
+
+	fmt.Println("UI Colors:")
+	colorBox(theme.FocusedBorderColor, "  Focused border")
+	colorBox(theme.BorderColor, "  Border")
+	colorBox(theme.TitleFg, "  Title")
+	fmt.Println()
+
+	fmt.Println("File List Colors:")
+	colorBox(theme.ModifiedFg, "  Modified")
+	colorBox(theme.AddedFg, "  Added")
+	colorBox(theme.DeletedFg, "  Deleted")
+	fmt.Println()
+
+	fmt.Println("General:")
+	colorBox(theme.Background, "  Background")
+	colorBox(theme.Foreground, "  Foreground")
+	fmt.Println()
+}
+
+func hexToRGB(hex string) (int, int, int) {
+	// Remove # if present
+	hex = strings.TrimPrefix(hex, "#")
+
+	// Parse hex color
+	var r, g, b int
+	fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
+	return r, g, b
+}
+
 func main() {
+	// Load configuration file (user + repo)
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("Warning: Failed to load config: %v\n", err)
+		fmt.Println("Using default configuration...")
+		cfg = &config.Config{} // Use empty config
+		*cfg = config.DefaultConfig()
+	}
+	cfg.Validate()
+
 	var (
-		showVersion  bool
-		showHelp     bool
-		selectedFile string
-		showStaged   bool
-		showUnstaged bool
+		showVersion     bool
+		showHelp        bool
+		selectedFile    string
+		showStaged      bool
+		showUnstaged    bool
+		themeName       string
+		listThemes      bool
+		showThemeColors string
 	)
 
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
@@ -357,6 +510,9 @@ func main() {
 	flag.StringVar(&selectedFile, "file", "", "Open with specific file selected")
 	flag.BoolVar(&showStaged, "staged", false, "Show only staged changes")
 	flag.BoolVar(&showUnstaged, "unstaged", false, "Show only unstaged changes")
+	flag.StringVar(&themeName, "theme", cfg.Theme, "Color theme")
+	flag.BoolVar(&listThemes, "list-themes", false, "List all available themes")
+	flag.StringVar(&showThemeColors, "show-theme-colors", "", "Show color preview for a theme")
 	flag.Parse()
 
 	if showVersion {
@@ -369,8 +525,25 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Determine diff mode based on flags
-	diffMode := git.DiffAll // Default: show all changes
+	if listThemes {
+		printThemeList()
+		os.Exit(0)
+	}
+
+	if showThemeColors != "" {
+		printThemeColors(showThemeColors)
+		os.Exit(0)
+	}
+
+	// Validate and set theme (CLI flag or config file)
+	if !ui.ValidateTheme(themeName) {
+		fmt.Printf("Error: Invalid theme '%s'. Available themes: %v\n", themeName, ui.ListThemes())
+		os.Exit(1)
+	}
+	ui.SetTheme(themeName)
+
+	// Determine diff mode based on flags (CLI flags override config)
+	diffMode := git.DiffAll
 	if showStaged && showUnstaged {
 		fmt.Println("Error: Cannot use both --staged and --unstaged flags together")
 		os.Exit(1)
@@ -378,14 +551,39 @@ func main() {
 		diffMode = git.DiffStaged
 	} else if showUnstaged {
 		diffMode = git.DiffUnstaged
+	} else {
+		// Use config diff mode if no CLI flag provided
+		switch cfg.DiffMode {
+		case "staged":
+			diffMode = git.DiffStaged
+		case "unstaged":
+			diffMode = git.DiffUnstaged
+		default:
+			diffMode = git.DiffAll
+		}
+	}
+
+	// Determine initial context mode and line numbers from config
+	fullContext := cfg.ContextMode == "full"
+
+	// Find initial theme index for 't' key cycling
+	themeIdx := 0
+	themes := ui.ListThemes()
+	for i, t := range themes {
+		if t == themeName {
+			themeIdx = i
+			break
+		}
 	}
 
 	p := tea.NewProgram(
 		model{
-			showLineNumbers: true, // Default on
+			showLineNumbers: cfg.LineNumbers, // From config
+			fullContext:     fullContext,     // From config
 			focus:           focusFileList,
 			diffMode:        diffMode,
 			initialFile:     selectedFile,
+			currentThemeIdx: themeIdx,
 		},
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),

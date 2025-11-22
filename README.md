@@ -5,15 +5,17 @@
 [![CI](https://github.com/titobsala/Diffbubble/workflows/CI/badge.svg)](https://github.com/titobsala/Diffbubble/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/titobsala/Diffbubble)](https://github.com/titobsala/Diffbubble/releases)
 
-A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, and beautiful color-coded statistics.
+A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, customizable themes, and beautiful color-coded statistics.
 
-> **Note:** This is an early release (v0.1.0). Features and APIs may change as the project evolves.
+> **Note:** Currently at v0.3.0. New features: Theme system with 9 built-in themes, interactive theme cycling, and configuration file support!
 
 ## Features
 
 - **Multi-file navigation**: Sidebar showing all modified files with colored stats
 - **Side-by-side diff display**: View old and new versions simultaneously
 - **Synchronized scrolling**: Both panes scroll together for easy comparison
+- **Customizable themes**: 9 built-in themes with interactive cycling (press 't')
+- **Configuration file support**: User and per-repository config files
 - **Line numbers toggle**: Show/hide line numbers with 'n' key
 - **Context mode toggle**: Switch between focus mode (changes only) and full context (entire file)
 - **Beautiful statistics**: Color-coded additions (green), deletions (red), and delta (yellow)
@@ -92,6 +94,56 @@ cd Diffbubble
 go run main.go
 ```
 
+## Themes
+
+Diffbubble comes with 9 beautiful built-in themes to customize your diff viewing experience:
+
+- **dark** (default) - Classic dark theme with green/red diffs
+- **light** - Clean light background for bright environments
+- **high-contrast** - Maximum contrast for accessibility
+- **solarized** - Popular Solarized Dark color scheme
+- **dracula** - Dracula theme with purple accents
+- **github** - GitHub-style light diffs
+- **catppuccin** - Catppuccin Mocha theme
+- **tokyo-night** - Tokyo Night color scheme
+- **one-dark** - Atom's One Dark theme
+
+### Using Themes
+
+**List all available themes:**
+```sh
+diffbubble --list-themes
+```
+
+**Preview a theme's colors:**
+```sh
+diffbubble --show-theme-colors catppuccin
+```
+
+**Start with a specific theme:**
+```sh
+diffbubble --theme=tokyo-night
+```
+
+**Cycle through themes interactively:**
+Press `t` while the app is running to cycle through all available themes in real-time!
+
+### Theme Configuration
+
+You can set a default theme in your configuration file:
+
+**User config:** `~/.config/diffbubble/config.yaml`
+```yaml
+theme: catppuccin
+```
+
+**Repository config:** `.diffbubble.yml` (in your git repo root)
+```yaml
+theme: github
+```
+
+See `.config.example.yaml` for a complete configuration example.
+
 ## Usage
 
 ### Basic Usage
@@ -114,6 +166,9 @@ diffbubble [flags]
 - `--file=<filename>` - Open with specific file selected
 - `--staged` - Show only staged changes (git diff --cached)
 - `--unstaged` - Show only unstaged changes
+- `--theme=<name>` - Set color theme (default: dark)
+- `--list-themes` - List all available themes
+- `--show-theme-colors <name>` - Preview colors for a specific theme
 
 **Examples:**
 ```sh
@@ -129,8 +184,17 @@ diffbubble --unstaged
 # Open with README.md selected
 diffbubble --file=README.md
 
+# Use a specific theme
+diffbubble --theme=catppuccin
+
 # Combine flags
-diffbubble --staged --file=main.go
+diffbubble --staged --file=main.go --theme=tokyo-night
+
+# List all available themes
+diffbubble --list-themes
+
+# Preview theme colors
+diffbubble --show-theme-colors dracula
 ```
 
 ## Controls
@@ -143,6 +207,7 @@ diffbubble --staged --file=main.go
 ### Toggles
 -   **Line numbers:** Press `n` to toggle line numbers on/off (default: on)
 -   **Context mode:** Press `c` to toggle between focus mode (changes only) and full context (entire file)
+-   **Theme cycling:** Press `t` to cycle through all available themes interactively
 
 ### General
 -   **Quit:** Press `q`, `esc`, or `ctrl+c` to exit the application
