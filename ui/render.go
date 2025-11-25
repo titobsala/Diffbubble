@@ -287,9 +287,9 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, 
 	} else if searchInfo != "" {
 		// Show search results with navigation hints
 		if termWidth < 120 {
-			text = fmt.Sprintf("%s • n:next • N:prev • /:search • q:quit", searchInfo)
+			text = fmt.Sprintf("%s • n:next • N:prev • /:search • esc:clear", searchInfo)
 		} else {
-			text = fmt.Sprintf("%s • n: next match • N: previous match • /: new search • q/esc: quit", searchInfo)
+			text = fmt.Sprintf("%s • n: next match • N: previous match • /: new search • esc: clear search", searchInfo)
 		}
 	} else {
 		// Normal footer

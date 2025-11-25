@@ -128,6 +128,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				m.searchMode = false
+
+				// Force refresh of viewports to show highlights
+				if len(m.currentRows) > 0 {
+					searchHighlights := convertSearchMatches(m.searchMatches, m.currentMatchIdx)
+					m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers, searchHighlights...))
+					m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers, searchHighlights...))
+				}
 				return m, nil
 
 			default:
@@ -143,12 +150,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "esc":
-			// Exit search mode or quit
+			// Exit search mode (already handled above but just in case)
 			if m.searchMode {
 				m.searchMode = false
 				m.searchInput.Reset()
 				return m, nil
 			}
+
+			// Clear search matches if any exist
+			if len(m.searchMatches) > 0 || m.searchInput.Value() != "" {
+				m.searchMatches = nil
+				m.currentMatchIdx = -1
+				m.searchInput.Reset()
+
+				// Refresh viewports to remove highlights
+				if len(m.currentRows) > 0 {
+					m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers))
+					m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers))
+				}
+				return m, nil
+			}
+
+			// Otherwise quit
 			return m, tea.Quit
 
 		case "/":
