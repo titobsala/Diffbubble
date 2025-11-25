@@ -10,8 +10,10 @@ import (
 	"github.com/titobsala/Diffbubble/config"
 	"github.com/titobsala/Diffbubble/git"
 	"github.com/titobsala/Diffbubble/parser"
+	"github.com/titobsala/Diffbubble/search"
 	"github.com/titobsala/Diffbubble/ui"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -19,7 +21,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.3.0"
+	version  = "0.3.1"
 )
 
 type focusPane int
@@ -54,6 +56,13 @@ type model struct {
 	currentThemeIdx  int          // Current theme index for 't' key cycling
 	themeChangeMsg   string       // Brief message shown when theme changes
 	themeChangeTicks int          // Counter to clear theme change message
+
+	// Search state
+	searchMode       bool            // Whether search mode is active
+	searchInput      textinput.Model // Text input for search query
+	searchMatches    []search.Match  // All matches found
+	currentMatchIdx  int             // Index of current match being viewed (-1 if none)
+	searchInAllFiles bool            // Whether to search across all files
 }
 
 // Message types for async operations
@@ -80,16 +89,107 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		k := msg.String()
+
+		// Handle search mode input
+		if m.searchMode {
+			switch k {
+			case "esc":
+				// Exit search mode
+				m.searchMode = false
+				m.searchInput.Reset()
+				return m, nil
+
+			case "enter":
+				// Perform search
+				query := m.searchInput.Value()
+				if query != "" {
+					// Search current file
+					if len(m.currentRows) > 0 {
+						fileName := ""
+						if len(m.files) > 0 && m.selectedFile >= 0 && m.selectedFile < len(m.files) {
+							fileName = m.files[m.selectedFile].Path
+						}
+						m.searchMatches = search.SearchInRows(m.currentRows, query, fileName)
+						if len(m.searchMatches) > 0 {
+							m.currentMatchIdx = 0
+							// Scroll to first match
+							match := m.searchMatches[0]
+							pos := search.GetMatchPosition(match)
+							if match.Side == "left" {
+								m.leftView.YOffset = pos
+								m.rightView.YOffset = pos
+							} else {
+								m.rightView.YOffset = pos
+								m.leftView.YOffset = pos
+							}
+						} else {
+							m.currentMatchIdx = -1
+						}
+					}
+				}
+				m.searchMode = false
+				return m, nil
+
+			default:
+				// Pass input to text input
+				m.searchInput, cmd = m.searchInput.Update(msg)
+				return m, cmd
+			}
+		}
+
+		// Normal mode key handling
 		switch k {
-		case "ctrl+c", "q", "esc":
+		case "ctrl+c", "q":
 			return m, tea.Quit
 
+		case "esc":
+			// Exit search mode or quit
+			if m.searchMode {
+				m.searchMode = false
+				m.searchInput.Reset()
+				return m, nil
+			}
+			return m, tea.Quit
+
+		case "/":
+			// Enter search mode
+			m.searchMode = true
+			m.searchInput.Focus()
+			m.searchInput.Reset()
+			return m, nil
+
 		case "n":
+			// Navigate to next match (if matches exist), otherwise toggle line numbers
+			if len(m.searchMatches) > 0 && m.currentMatchIdx >= 0 {
+				// Next match
+				m.currentMatchIdx = (m.currentMatchIdx + 1) % len(m.searchMatches)
+				match := m.searchMatches[m.currentMatchIdx]
+				pos := search.GetMatchPosition(match)
+				m.leftView.YOffset = pos
+				m.rightView.YOffset = pos
+				return m, nil
+			}
 			// Toggle line numbers
 			m.showLineNumbers = !m.showLineNumbers
 			if len(m.currentRows) > 0 {
-				m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers))
-				m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers))
+				searchHighlights := convertSearchMatches(m.searchMatches, m.currentMatchIdx)
+				m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers, searchHighlights...))
+				m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers, searchHighlights...))
+			}
+			return m, nil
+
+		case "N":
+			// Navigate to previous match
+			if len(m.searchMatches) > 0 && m.currentMatchIdx >= 0 {
+				m.currentMatchIdx--
+				if m.currentMatchIdx < 0 {
+					m.currentMatchIdx = len(m.searchMatches) - 1
+				}
+				match := m.searchMatches[m.currentMatchIdx]
+				pos := search.GetMatchPosition(match)
+				m.leftView.YOffset = pos
+				m.rightView.YOffset = pos
+				return m, nil
 			}
 			return m, nil
 
@@ -115,8 +215,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// Re-render current diff with new theme
 			if len(m.currentRows) > 0 {
-				m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers))
-				m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers))
+				searchHighlights := convertSearchMatches(m.searchMatches, m.currentMatchIdx)
+				m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers, searchHighlights...))
+				m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers, searchHighlights...))
 			}
 			if len(m.files) > 0 && m.ready {
 				m.fileListView.SetContent(ui.RenderFileList(m.files, m.selectedFile))
@@ -201,8 +302,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 
 			// Update diff viewports
-			m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers))
-			m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers))
+			searchHighlights := convertSearchMatches(m.searchMatches, m.currentMatchIdx)
+			m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers, searchHighlights...))
+			m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers, searchHighlights...))
 
 			// Update file list to show new selection
 			if len(m.files) > 0 {
@@ -301,10 +403,28 @@ func (m model) View() string {
 	}
 
 	focusOnFileList := m.focus == focusFileList
-	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext, focusOnFileList, m.winWidth)
+
+	// Prepare search info for footer
+	searchInfo := ""
+	if len(m.searchMatches) > 0 && m.currentMatchIdx >= 0 {
+		searchInfo = fmt.Sprintf("Match %d of %d", m.currentMatchIdx+1, len(m.searchMatches))
+	} else if len(m.searchMatches) == 0 && m.searchInput.Value() != "" && !m.searchMode {
+		searchInfo = "No matches found"
+	}
+
+	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext, focusOnFileList, m.searchMode, searchInfo, m.winWidth)
+
+	// Show search input if in search mode
+	var searchBar string
+	if m.searchMode {
+		searchBar = "\n" + ui.SearchInputStyle.Render(m.searchInput.View())
+	}
 
 	if m.err != nil {
 		errorBox := ui.ErrorBox(m.err, m.winWidth)
+		if searchBar != "" {
+			return lipgloss.JoinVertical(lipgloss.Top, header, searchBar, errorBox, footer)
+		}
 		return lipgloss.JoinVertical(lipgloss.Top, header, errorBox, footer)
 	}
 
@@ -332,7 +452,25 @@ func (m model) View() string {
 	// Join horizontally: sidebar | left diff | right diff
 	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebarBox, leftBox, rightBox)
 
+	if searchBar != "" {
+		return lipgloss.JoinVertical(lipgloss.Top, header, searchBar, body, footer)
+	}
 	return lipgloss.JoinVertical(lipgloss.Top, header, body, footer)
+}
+
+// convertSearchMatches converts search.Match to ui.SearchMatch format
+func convertSearchMatches(matches []search.Match, currentMatchIdx int) []ui.SearchMatch {
+	var result []ui.SearchMatch
+	for i, match := range matches {
+		result = append(result, ui.SearchMatch{
+			RowIndex:  match.RowIndex,
+			Side:      match.Side,
+			Column:    match.Column,
+			Length:    match.Length,
+			IsCurrent: i == currentMatchIdx,
+		})
+	}
+	return result
 }
 
 func loadFilesCmd(mode git.DiffMode, initialFile string) tea.Cmd {
@@ -576,14 +714,23 @@ func main() {
 		}
 	}
 
+	// Initialize search input
+	ti := textinput.New()
+	ti.Placeholder = "Search..."
+	ti.CharLimit = 100
+	ti.Width = 50
+
 	p := tea.NewProgram(
 		model{
-			showLineNumbers: cfg.LineNumbers, // From config
-			fullContext:     fullContext,     // From config
-			focus:           focusFileList,
-			diffMode:        diffMode,
-			initialFile:     selectedFile,
-			currentThemeIdx: themeIdx,
+			showLineNumbers:  cfg.LineNumbers, // From config
+			fullContext:      fullContext,     // From config
+			focus:            focusFileList,
+			diffMode:         diffMode,
+			initialFile:      selectedFile,
+			currentThemeIdx:  themeIdx,
+			searchInput:      ti,
+			currentMatchIdx:  -1,   // No match selected initially
+			searchInAllFiles: true, // Default to searching all files
 		},
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),

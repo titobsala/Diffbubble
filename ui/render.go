@@ -9,6 +9,16 @@ import (
 	"github.com/titobsala/Diffbubble/parser"
 )
 
+// SearchMatch represents a search match for highlighting
+// We define it here to avoid circular imports
+type SearchMatch struct {
+	RowIndex  int
+	Side      string
+	Column    int
+	Length    int
+	IsCurrent bool
+}
+
 type Side int
 
 const (
@@ -17,21 +27,39 @@ const (
 )
 
 // RenderSide turns structured diff rows into a string suitable for a viewport.
-func RenderSide(rows []parser.DiffRow, side Side, showLineNumbers bool) string {
+// If searchMatches is provided, it highlights the matches in the output.
+func RenderSide(rows []parser.DiffRow, side Side, showLineNumbers bool, searchMatches ...SearchMatch) string {
 	var sb strings.Builder
 	width := 0
 	if showLineNumbers {
 		width = lineNumberWidth(rows, side)
 	}
 
-	for _, row := range rows {
+	// Build a map of row index + side to matches for quick lookup
+	matchMap := make(map[string][]SearchMatch)
+	if len(searchMatches) > 0 {
+		for _, match := range searchMatches {
+			key := fmt.Sprintf("%d_%s", match.RowIndex, match.Side)
+			matchMap[key] = append(matchMap[key], match)
+		}
+	}
+
+	for rowIdx, row := range rows {
 		line := rowForSide(row, side)
 		if line != nil && line.Kind == parser.LineKindHeader {
 			sb.WriteString(renderHeader(line.Content))
 			continue
 		}
 
-		sb.WriteString(renderLine(line, side, width, showLineNumbers))
+		// Get matches for this row and side
+		sideStr := "left"
+		if side == SideRight {
+			sideStr = "right"
+		}
+		key := fmt.Sprintf("%d_%s", rowIdx, sideStr)
+		matches := matchMap[key]
+
+		sb.WriteString(renderLine(line, side, width, showLineNumbers, matches))
 		sb.WriteByte('\n')
 	}
 
@@ -61,7 +89,7 @@ func renderHeader(content string) string {
 	return separator + "\n" + header + "\n"
 }
 
-func renderLine(line *parser.DiffLine, side Side, width int, showLineNumbers bool) string {
+func renderLine(line *parser.DiffLine, side Side, width int, showLineNumbers bool, matches []SearchMatch) string {
 	if line == nil {
 		if showLineNumbers {
 			return strings.Repeat(" ", width+1)
@@ -69,14 +97,21 @@ func renderLine(line *parser.DiffLine, side Side, width int, showLineNumbers boo
 		return ""
 	}
 
-	var text string
+	content := line.Content
+	prefix := ""
 	if showLineNumbers && line.Number > 0 {
 		number := strconv.Itoa(line.Number)
-		text = fmt.Sprintf("%*s %s", width, number, line.Content)
-	} else {
-		text = line.Content
+		prefix = fmt.Sprintf("%*s ", width, number)
 	}
 
+	// Apply search highlighting if matches exist
+	if len(matches) > 0 {
+		content = applySearchHighlights(content, matches)
+	}
+
+	text := prefix + content
+
+	// Apply diff styling
 	switch line.Kind {
 	case parser.LineKindAddition:
 		if side == SideRight {
@@ -89,6 +124,47 @@ func renderLine(line *parser.DiffLine, side Side, width int, showLineNumbers boo
 	}
 
 	return text
+}
+
+// applySearchHighlights applies search match highlighting to a line of text
+func applySearchHighlights(content string, matches []SearchMatch) string {
+	if len(matches) == 0 {
+		return content
+	}
+
+	// Sort matches by column to process them in order
+	// Build segments with highlighted matches
+	var result strings.Builder
+	lastPos := 0
+
+	for _, match := range matches {
+		// Add text before match
+		if match.Column > lastPos {
+			result.WriteString(content[lastPos:match.Column])
+		}
+
+		// Add highlighted match
+		matchEnd := match.Column + match.Length
+		if matchEnd > len(content) {
+			matchEnd = len(content)
+		}
+		matchText := content[match.Column:matchEnd]
+
+		if match.IsCurrent {
+			result.WriteString(SearchCurrentMatchStyle.Render(matchText))
+		} else {
+			result.WriteString(SearchMatchStyle.Render(matchText))
+		}
+
+		lastPos = matchEnd
+	}
+
+	// Add remaining text after last match
+	if lastPos < len(content) {
+		result.WriteString(content[lastPos:])
+	}
+
+	return result.String()
 }
 
 func lineNumberWidth(rows []parser.DiffRow, side Side) int {
@@ -186,7 +262,8 @@ func truncate(s string, maxLen int) string {
 }
 
 // RenderFooter renders the footer with keyboard shortcuts and feature states.
-func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, termWidth int) string {
+// searchInfo format: "Match X of Y" or empty string if no search
+func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, searchMode bool, searchInfo string, termWidth int) string {
 	lineNumHint := "on"
 	if !showLineNumbers {
 		lineNumHint = "off"
@@ -203,22 +280,36 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, 
 	}
 
 	var text string
-	if termWidth < 120 {
-		// Shortened version for narrow terminals
-		text = fmt.Sprintf(
-			"tab:pane(%s) • j/k:nav • n:nums(%s) • c:ctx(%s) • t:theme • q:quit",
-			focusHint,
-			lineNumHint,
-			contextHint,
-		)
+
+	// If in search mode, show search prompt
+	if searchMode {
+		text = "Search: (type to search, Enter to confirm, Esc to cancel)"
+	} else if searchInfo != "" {
+		// Show search results with navigation hints
+		if termWidth < 120 {
+			text = fmt.Sprintf("%s • n:next • N:prev • /:search • q:quit", searchInfo)
+		} else {
+			text = fmt.Sprintf("%s • n: next match • N: previous match • /: new search • q/esc: quit", searchInfo)
+		}
 	} else {
-		// Full version for wider terminals
-		text = fmt.Sprintf(
-			"tab: switch pane (%s) • j/k: scroll/navigate • n: line numbers (%s) • c: context (%s) • t: cycle theme • q/esc: quit",
-			focusHint,
-			lineNumHint,
-			contextHint,
-		)
+		// Normal footer
+		if termWidth < 120 {
+			// Shortened version for narrow terminals
+			text = fmt.Sprintf(
+				"tab:pane(%s) • j/k:nav • n:nums(%s) • c:ctx(%s) • t:theme • /:search • q:quit",
+				focusHint,
+				lineNumHint,
+				contextHint,
+			)
+		} else {
+			// Full version for wider terminals
+			text = fmt.Sprintf(
+				"tab: switch pane (%s) • j/k: scroll/navigate • n: line numbers (%s) • c: context (%s) • t: cycle theme • /: search • q/esc: quit",
+				focusHint,
+				lineNumHint,
+				contextHint,
+			)
+		}
 	}
 
 	return FooterStyle.Render(text)
