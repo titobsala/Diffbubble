@@ -19,24 +19,30 @@ type Match struct {
 
 // SearchInRows searches for a query string within a single file's diff rows.
 // Returns all matches found in the current file.
-func SearchInRows(rows []parser.DiffRow, query string, fileName string) []Match {
+func SearchInRows(rows []parser.DiffRow, query string, fileName string, caseSensitive bool) []Match {
 	if query == "" {
 		return nil
 	}
 
 	var matches []Match
-	lowerQuery := strings.ToLower(query)
+	lowerQuery := query
+	if !caseSensitive {
+		lowerQuery = strings.ToLower(query)
+	}
 
 	for rowIdx, row := range rows {
 		// Search in left side
 		if row.Left != nil && row.Left.Kind != parser.LineKindHeader {
 			content := row.Left.Content
-			lowerContent := strings.ToLower(content)
+			searchContent := content
+			if !caseSensitive {
+				searchContent = strings.ToLower(content)
+			}
 
 			// Find all occurrences in this line
 			startPos := 0
 			for {
-				pos := strings.Index(lowerContent[startPos:], lowerQuery)
+				pos := strings.Index(searchContent[startPos:], lowerQuery)
 				if pos == -1 {
 					break
 				}
@@ -50,19 +56,23 @@ func SearchInRows(rows []parser.DiffRow, query string, fileName string) []Match 
 					Length:     len(query),
 					Content:    content,
 				})
-				startPos = actualPos + 1
+				// Advance by length of query to prevent overlaps
+				startPos = actualPos + len(query)
 			}
 		}
 
 		// Search in right side
 		if row.Right != nil && row.Right.Kind != parser.LineKindHeader {
 			content := row.Right.Content
-			lowerContent := strings.ToLower(content)
+			searchContent := content
+			if !caseSensitive {
+				searchContent = strings.ToLower(content)
+			}
 
 			// Find all occurrences in this line
 			startPos := 0
 			for {
-				pos := strings.Index(lowerContent[startPos:], lowerQuery)
+				pos := strings.Index(searchContent[startPos:], lowerQuery)
 				if pos == -1 {
 					break
 				}
@@ -76,7 +86,8 @@ func SearchInRows(rows []parser.DiffRow, query string, fileName string) []Match 
 					Length:     len(query),
 					Content:    content,
 				})
-				startPos = actualPos + 1
+				// Advance by length of query to prevent overlaps
+				startPos = actualPos + len(query)
 			}
 		}
 	}

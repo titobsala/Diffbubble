@@ -100,47 +100,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 
 			case "enter":
-				// Perform search
-				query := m.searchInput.Value()
-				if query != "" {
-					// Search current file
-					if len(m.currentRows) > 0 {
-						fileName := ""
-						if len(m.files) > 0 && m.selectedFile >= 0 && m.selectedFile < len(m.files) {
-							fileName = m.files[m.selectedFile].Path
-						}
-						m.searchMatches = search.SearchInRows(m.currentRows, query, fileName)
-						if len(m.searchMatches) > 0 {
-							m.currentMatchIdx = 0
-							// Scroll to first match
-							match := m.searchMatches[0]
-							pos := search.GetMatchPosition(match)
-							if match.Side == "left" {
-								m.leftView.YOffset = pos
-								m.rightView.YOffset = pos
-							} else {
-								m.rightView.YOffset = pos
-								m.leftView.YOffset = pos
-							}
-						} else {
-							m.currentMatchIdx = -1
-						}
-					}
-				}
 				m.searchMode = false
-
-				// Force refresh of viewports to show highlights
-				if len(m.currentRows) > 0 {
-					searchHighlights := convertSearchMatches(m.searchMatches, m.currentMatchIdx)
-					m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers, searchHighlights...))
-					m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers, searchHighlights...))
-				}
 				return m, nil
 
 			default:
 				// Pass input to text input
-				m.searchInput, cmd = m.searchInput.Update(msg)
-				return m, cmd
+				var newCmd tea.Cmd
+				m.searchInput, newCmd = m.searchInput.Update(msg)
+				
+				// Perform dynamic search as user types
+				m.performSearch()
+				
+				return m, newCmd
 			}
 		}
 
@@ -641,6 +612,46 @@ func hexToRGB(hex string) (int, int, int) {
 	var r, g, b int
 	fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
 	return r, g, b
+}
+
+func (m *model) performSearch() {
+	query := m.searchInput.Value()
+	if query == "" {
+		m.searchMatches = nil
+		m.currentMatchIdx = -1
+	} else {
+		// Search current file
+		if len(m.currentRows) > 0 {
+			fileName := ""
+			if len(m.files) > 0 && m.selectedFile >= 0 && m.selectedFile < len(m.files) {
+				fileName = m.files[m.selectedFile].Path
+			}
+			// Use case-insensitive search for now (false)
+			m.searchMatches = search.SearchInRows(m.currentRows, query, fileName, false)
+			if len(m.searchMatches) > 0 {
+				m.currentMatchIdx = 0
+				// Scroll to first match
+				match := m.searchMatches[0]
+				pos := search.GetMatchPosition(match)
+				if match.Side == "left" {
+					m.leftView.YOffset = pos
+					m.rightView.YOffset = pos
+				} else {
+					m.rightView.YOffset = pos
+					m.leftView.YOffset = pos
+				}
+			} else {
+				m.currentMatchIdx = -1
+			}
+		}
+	}
+
+	// Refresh viewports to show/hide highlights
+	if len(m.currentRows) > 0 {
+		searchHighlights := convertSearchMatches(m.searchMatches, m.currentMatchIdx)
+		m.leftView.SetContent(ui.RenderSide(m.currentRows, ui.SideLeft, m.showLineNumbers, searchHighlights...))
+		m.rightView.SetContent(ui.RenderSide(m.currentRows, ui.SideRight, m.showLineNumbers, searchHighlights...))
+	}
 }
 
 func updateSearchStyles(ti *textinput.Model) {
