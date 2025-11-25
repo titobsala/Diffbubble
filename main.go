@@ -208,6 +208,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.currentThemeIdx = (m.currentThemeIdx + 1) % len(themes)
 			newTheme := themes[m.currentThemeIdx]
 			ui.SetTheme(newTheme)
+			updateSearchStyles(&m.searchInput)
 
 			// Show theme change message
 			m.themeChangeMsg = fmt.Sprintf("Theme: %s", newTheme)
@@ -417,13 +418,13 @@ func (m model) View() string {
 	// Show search input if in search mode
 	var searchBar string
 	if m.searchMode {
-		searchBar = "\n" + ui.SearchInputStyle.Render(m.searchInput.View())
+		searchBar = ui.SearchInputStyle.Render(m.searchInput.View())
 	}
 
 	if m.err != nil {
 		errorBox := ui.ErrorBox(m.err, m.winWidth)
 		if searchBar != "" {
-			return lipgloss.JoinVertical(lipgloss.Top, header, searchBar, errorBox, footer)
+			return lipgloss.JoinVertical(lipgloss.Top, header, errorBox, searchBar, footer)
 		}
 		return lipgloss.JoinVertical(lipgloss.Top, header, errorBox, footer)
 	}
@@ -453,7 +454,7 @@ func (m model) View() string {
 	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebarBox, leftBox, rightBox)
 
 	if searchBar != "" {
-		return lipgloss.JoinVertical(lipgloss.Top, header, searchBar, body, footer)
+		return lipgloss.JoinVertical(lipgloss.Top, header, body, searchBar, footer)
 	}
 	return lipgloss.JoinVertical(lipgloss.Top, header, body, footer)
 }
@@ -619,6 +620,13 @@ func hexToRGB(hex string) (int, int, int) {
 	return r, g, b
 }
 
+func updateSearchStyles(ti *textinput.Model) {
+	theme := ui.GetTheme()
+	ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Foreground))
+	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(theme.ContextFg))
+	ti.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(theme.FocusedBorderColor))
+}
+
 func main() {
 	// Load configuration file (user + repo)
 	cfg, err := config.Load()
@@ -719,6 +727,7 @@ func main() {
 	ti.Placeholder = "Search..."
 	ti.CharLimit = 100
 	ti.Width = 50
+	updateSearchStyles(&ti)
 
 	p := tea.NewProgram(
 		model{
