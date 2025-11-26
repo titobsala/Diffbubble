@@ -107,10 +107,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Pass input to text input
 				var newCmd tea.Cmd
 				m.searchInput, newCmd = m.searchInput.Update(msg)
-				
+
 				// Perform dynamic search as user types
 				m.performSearch()
-				
+
 				return m, newCmd
 			}
 		}
