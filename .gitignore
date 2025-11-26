@@ -44,8 +44,9 @@ Thumbs.db
 # Binary builds
 dist/
 build/
-diffbuble
 diffbubble
+diffbubble-dev
+Diffbubble
 
 # Environment files
 .env
