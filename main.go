@@ -259,11 +259,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// No files found - provide helpful context-specific message
 			switch m.diffMode {
 			case git.DiffStaged:
-				m.err = fmt.Errorf("No staged changes found.\n\nTry one of the following:\n  • Run 'git add <file>' to stage some changes\n  • Use --unstaged to see unstaged changes\n  • Remove --staged flag to see all changes")
+				m.err = fmt.Errorf("no staged changes found.\n\nTry one of the following:\n  • Run 'git add <file>' to stage some changes\n  • Use --unstaged to see unstaged changes\n  • Remove --staged flag to see all changes")
 			case git.DiffUnstaged:
-				m.err = fmt.Errorf("No unstaged changes found.\n\nTry one of the following:\n  • Use --staged to see staged changes\n  • Remove --unstaged flag to see all changes\n  • Make some changes to your working directory")
+				m.err = fmt.Errorf("no unstaged changes found.\n\nTry one of the following:\n  • Use --staged to see staged changes\n  • Remove --unstaged flag to see all changes\n  • Make some changes to your working directory")
 			default:
-				m.err = fmt.Errorf("No changes found in the repository.\n\nMake sure you have:\n  • Modified some files in your working directory\n  • Staged some changes with 'git add'\n  • Checked that you're in a git repository")
+				m.err = fmt.Errorf("no changes found in the repository.\n\nMake sure you have:\n  • Modified some files in your working directory\n  • Staged some changes with 'git add'\n  • Checked that you're in a git repository")
 			}
 		}
 
@@ -468,7 +468,7 @@ func convertSearchMatches(matches []search.Match, currentMatchIdx int) []ui.Sear
 	return result
 }
 
-func loadFilesCmd(mode git.DiffMode, initialFile string) tea.Cmd {
+func loadFilesCmd(mode git.DiffMode, _ string) tea.Cmd {
 	return func() tea.Msg {
 		files, err := git.GetModifiedFiles(mode)
 		return filesLoadedMsg{files: files, err: err}
