@@ -5,6 +5,10 @@
 *.so
 *.dylib
 
+diffbubble
+diffbubble-dev
+Diffbubble
+
 # Test binary, built with `go test -c`
 *.test
 
