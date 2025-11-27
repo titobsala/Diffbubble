@@ -5,15 +5,16 @@
 [![CI](https://github.com/titobsala/Diffbubble/workflows/CI/badge.svg)](https://github.com/titobsala/Diffbubble/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/titobsala/Diffbubble)](https://github.com/titobsala/Diffbubble/releases)
 
-A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, customizable themes, and beautiful color-coded statistics.
+A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, customizable themes, search functionality, and beautiful color-coded statistics.
 
-> **Note:** Currently at v0.3.0. New features: Theme system with 9 built-in themes, interactive theme cycling, and configuration file support!
+> **Note:** Currently at v0.3.1. New features: Search functionality with real-time highlighting and match navigation!
 
 ## Features
 
 - **Multi-file navigation**: Sidebar showing all modified files with colored stats
 - **Side-by-side diff display**: View old and new versions simultaneously
 - **Synchronized scrolling**: Both panes scroll together for easy comparison
+- **Search functionality**: Press '/' to search, real-time highlighting, navigate with 'n'/'N'
 - **Customizable themes**: 9 built-in themes with interactive cycling (press 't')
 - **Configuration file support**: User and per-repository config files
 - **Line numbers toggle**: Show/hide line numbers with 'n' key
@@ -204,8 +205,15 @@ diffbubble --show-theme-colors dracula
 -   **Diff scrolling:** When diff is focused, use `j`/`k` or `↑`/`↓` to scroll through the diff. Both panes scroll simultaneously.
 -   **Switch pane:** Press `tab` to switch focus between file list and diff panes (purple border indicates focused pane)
 
+### Search
+-   **Enter search:** Press `/` to activate search mode and type your query
+-   **Execute search:** Press `Enter` to search and highlight matches
+-   **Navigate matches:** Press `n` for next match, `N` for previous match
+-   **Exit search:** Press `Esc` to cancel search mode
+-   **Match status:** Current match shown in gold/underline, others in orange; footer shows "Match X of Y"
+
 ### Toggles
--   **Line numbers:** Press `n` to toggle line numbers on/off (default: on)
+-   **Line numbers:** Press `n` to toggle line numbers on/off (or next match when search is active)
 -   **Context mode:** Press `c` to toggle between focus mode (changes only) and full context (entire file)
 -   **Theme cycling:** Press `t` to cycle through all available themes interactively
 

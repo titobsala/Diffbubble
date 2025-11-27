@@ -95,7 +95,18 @@ The application follows a clean separation of concerns with three main layers an
   - **Priority chain**: CLI flags > repo config > user config > defaults
   - **Supported settings**: theme, line_numbers, context_mode, diff_mode, key_bindings
 
-### 5. Main Application (`main.go`)
+### 5. Search Layer (`search/`)
+- `search/search.go`: Search functionality (v0.3.1+)
+  - `Match` struct: Stores match position (file, row, side, column, length)
+  - `SearchInRows()`: Case-insensitive search within a file's diff rows
+  - `GetMatchPosition()`: Returns scroll position for a match
+  - **Features**:
+    - Finds all occurrences of query in both left and right diff sides
+    - Multiple matches per line supported
+    - Skips header lines
+    - Returns empty slice if query is empty
+
+### 6. Main Application (`main.go`)
 - Implements Bubble Tea's Model-View-Update pattern with 3-column layout
 - Model state:
   - **File list**: `[]git.FileStat` stores all modified files, `selectedFile` tracks current selection
@@ -109,6 +120,12 @@ The application follows a clean separation of concerns with three main layers an
     - `currentThemeIdx int` tracks current theme index for 't' key cycling
     - `themeChangeMsg string` displays theme change notification
     - `themeChangeTicks int` controls how long the notification is shown
+  - **Search state** (v0.3.1+):
+    - `searchMode bool` indicates if search input is active
+    - `searchInput textinput.Model` text input component for query
+    - `searchMatches []search.Match` all found matches
+    - `currentMatchIdx int` index of currently highlighted match (-1 if none)
+    - `searchInAllFiles bool` whether to search across all files (not yet implemented)
   - **CLI options**:
     - `diffMode git.DiffMode` for staged/unstaged/all changes
     - `initialFile string` for pre-selecting a file on startup
@@ -120,6 +137,13 @@ The application follows a clean separation of concerns with three main layers an
   - **Line number toggle**: 'n' key toggles line numbers and re-renders diff
   - **Context toggle**: 'c' key toggles between focus mode and full context
   - **Theme cycling**: 't' key cycles through all themes interactively with notification (v0.3.0+)
+  - **Search functionality**: (v0.3.1+)
+    - '/' key enters search mode with text input
+    - Enter key performs search and highlights matches
+    - 'n'/'N' keys navigate matches when search is active
+    - Smart 'n' behavior: next match if search active, toggle line numbers otherwise
+    - Auto-scroll to match position when navigating
+    - Displays "Match X of Y" in footer
   - **Focus switching**: Tab key switches between file list and diff panes
   - **Synchronized scrolling**: Diff panes scroll together via `YOffset` syncing
   - Window resize handling for all three panes
@@ -213,9 +237,17 @@ Context-specific error messages when no files are found:
 ### Global
 - `q`, `esc`, `ctrl+c`: Quit application
 - `tab`: Switch focus between file list and diff panes
-- `n`: Toggle line numbers on/off
+- `n`: Toggle line numbers on/off (or next match when search is active)
 - `c`: Toggle between focus mode and full context
 - `t`: Cycle through themes interactively (v0.3.0+)
+- `/`: Enter search mode (v0.3.1+)
+
+### Search Mode (v0.3.1+)
+- Type to search: Enter search query
+- `Enter`: Execute search and exit search mode
+- `Esc`: Cancel search and exit search mode
+- `n`: Navigate to next match
+- `N`: Navigate to previous match
 
 ### When File List is Focused
 - `j`, `↓`: Select next file (loads its diff)
@@ -335,24 +367,19 @@ go fmt ./...
   - Helpful suggestions based on diff mode (staged/unstaged/all)
   - Better UX when no changes are found
 
-### 🎯 High Priority (v0.3.1+)
+#### v0.3.1
+- ✅ **Search Functionality** 🔍
+  - Press `/` to enter search mode with text input
+  - Real-time search highlighting with orange background
+  - Navigate matches with `n` (next) and `N` (previous)
+  - Current match highlighted in gold with underline
+  - Case-insensitive search
+  - Search status in footer (e.g., "Match 3 of 15")
+  - Search within current file
+  - "No matches found" message when query has no results
+  - Smart 'n' key behavior: next match when search active, toggle line numbers otherwise
 
-#### 1. Search Functionality 🔍
-**Priority**: HIGH | **Effort**: Medium | **User Value**: Very High
-
-- Press `/` to enter search mode
-- Real-time search highlighting
-- Navigate results with `n` (next) and `N` (previous)
-- Case-sensitive and case-insensitive modes
-- Regex support (toggle with flag)
-- Search scope: current file or all files
-- Search status in footer (e.g., "Match 3 of 15")
-
-**Implementation Notes**:
-- Add search state to model (query, matches, current index)
-- Update render to highlight search matches
-- Add search input mode (like vim)
-- Preserve scroll position when navigating matches
+### 🎯 High Priority (v0.4.0+)
 
 ### 📝 Medium Priority (v0.4.0)
 

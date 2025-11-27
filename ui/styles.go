@@ -30,6 +30,11 @@ var (
 	// Border styles for focused/unfocused panes
 	BorderStyleFocused   lipgloss.Style
 	BorderStyleUnfocused lipgloss.Style
+
+	// Search match highlighting styles
+	SearchMatchStyle        lipgloss.Style
+	SearchCurrentMatchStyle lipgloss.Style
+	SearchInputStyle        lipgloss.Style
 )
 
 // updateStyles applies the current theme to all styles
@@ -122,4 +127,21 @@ func updateStyles() {
 	BorderStyleUnfocused = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(theme.BorderColor))
+
+	// Search match highlighting styles
+	SearchMatchStyle = lipgloss.NewStyle().
+		Background(lipgloss.Color("#FFA500")).
+		Foreground(lipgloss.Color("#000000")).
+		Bold(true)
+
+	SearchCurrentMatchStyle = lipgloss.NewStyle().
+		Background(lipgloss.Color("#FFD700")).
+		Foreground(lipgloss.Color("#000000")).
+		Bold(true).
+		Underline(true)
+
+	SearchInputStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(theme.FocusedBorderColor)).
+		Padding(0, 1)
 }

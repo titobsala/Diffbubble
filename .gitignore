@@ -5,6 +5,10 @@
 *.so
 *.dylib
 
+diffbubble
+diffbubble-dev
+Diffbubble
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -44,8 +48,9 @@ Thumbs.db
 # Binary builds
 dist/
 build/
-diffbuble
 diffbubble
+diffbubble-dev
+Diffbubble
 
 # Environment files
 .env
