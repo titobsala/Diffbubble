@@ -21,7 +21,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.3.1"
+	version  = "0.3.2"
 )
 
 type focusPane int
