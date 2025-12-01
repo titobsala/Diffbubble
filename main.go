@@ -21,7 +21,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.3.2"
+	version  = "0.3.3"
 )
 
 type focusPane int
@@ -320,7 +320,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Increased margin to account for header, footer, borders, and potential text wrapping
 		headerHeight := 3 // Title + margin + buffer
 		footerHeight := 3 // Footer can wrap to 2-3 lines in narrow terminals
-		verticalMarginHeight := headerHeight + footerHeight
+		borderHeight := 2 // Top and bottom borders for viewports
+		verticalMarginHeight := headerHeight + footerHeight + borderHeight
 
 		// 20% for sidebar, 40% for each diff pane
 		sidebarWidth := msg.Width * 20 / 100
