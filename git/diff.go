@@ -219,13 +219,13 @@ func GetFileDiff(filepath string, contextLines int, mode DiffMode) ([]byte, erro
 		} else if contextLines > 0 {
 			args = append(args, fmt.Sprintf("-U%d", contextLines))
 		}
-		
+
 		args = append(args, "--", filepath)
 	}
 
 	cmd := exec.Command("git", args...)
 	out, err := cmd.Output()
-	
+
 	// git diff exits with 1 if there are differences, which is not an error for us
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {

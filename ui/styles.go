@@ -20,12 +20,12 @@ var (
 	SelectedFileStyle    lipgloss.Style
 
 	// Stats styles
-	AdditionsStyle      lipgloss.Style
-	DeletionsStyle      lipgloss.Style
-	DeltaStyle          lipgloss.Style
-	StatusModifiedStyle lipgloss.Style
-	StatusAddedStyle    lipgloss.Style
-	StatusDeletedStyle  lipgloss.Style
+	AdditionsStyle       lipgloss.Style
+	DeletionsStyle       lipgloss.Style
+	DeltaStyle           lipgloss.Style
+	StatusModifiedStyle  lipgloss.Style
+	StatusAddedStyle     lipgloss.Style
+	StatusDeletedStyle   lipgloss.Style
 	StatusUntrackedStyle lipgloss.Style
 
 	// Border styles for focused/unfocused panes

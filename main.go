@@ -292,7 +292,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.selectedFile >= len(m.files) {
 				m.selectedFile = 0
 			}
-			
+
 			if m.initialFile != "" {
 				// Find the specified file in the list
 				for i, file := range m.files {
