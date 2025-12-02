@@ -26,6 +26,7 @@ var (
 	StatusModifiedStyle lipgloss.Style
 	StatusAddedStyle    lipgloss.Style
 	StatusDeletedStyle  lipgloss.Style
+	StatusUntrackedStyle lipgloss.Style
 
 	// Border styles for focused/unfocused panes
 	BorderStyleFocused   lipgloss.Style
@@ -117,6 +118,10 @@ func updateStyles() {
 
 	StatusDeletedStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(theme.DeletedFg)).
+		Bold(true)
+
+	StatusUntrackedStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(theme.AddedFg)).
 		Bold(true)
 
 	// Border styles for focused/unfocused panes

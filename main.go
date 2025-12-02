@@ -21,7 +21,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.3.3"
+	version  = "0.4.0"
 )
 
 type focusPane int
@@ -51,6 +51,7 @@ type model struct {
 	// Feature toggles
 	showLineNumbers  bool
 	fullContext      bool         // false = focus mode (default), true = full context mode
+	showUntracked    bool         // false = hide untracked files (default), true = show them
 	diffMode         git.DiffMode // Which changes to show (all, staged, unstaged)
 	initialFile      string       // File to pre-select on startup (if specified)
 	currentThemeIdx  int          // Current theme index for 't' key cycling
@@ -77,7 +78,7 @@ type fileDiffLoadedMsg struct {
 }
 
 func (m model) Init() tea.Cmd {
-	return loadFilesCmd(m.diffMode, m.initialFile)
+	return loadFilesCmd(m.diffMode, m.initialFile, m.showUntracked)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -196,6 +197,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case "u":
+			// Toggle untracked files visibility
+			m.showUntracked = !m.showUntracked
+			// Reload files
+			return m, loadFilesCmd(m.diffMode, "", m.showUntracked)
+
 		case "t":
 			// Cycle through themes
 			themes := ui.ListThemes()
@@ -263,7 +270,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case git.DiffUnstaged:
 				m.err = fmt.Errorf("no unstaged changes found.\n\nTry one of the following:\n  • Use --staged to see staged changes\n  • Remove --unstaged flag to see all changes\n  • Make some changes to your working directory")
 			default:
-				m.err = fmt.Errorf("no changes found in the repository.\n\nMake sure you have:\n  • Modified some files in your working directory\n  • Staged some changes with 'git add'\n  • Checked that you're in a git repository")
+				msg := "no changes found in the repository.\n\nMake sure you have:\n  • Modified some files in your working directory\n  • Staged some changes with 'git add'\n  • Checked that you're in a git repository"
+				if !m.showUntracked {
+					msg += "\n  • Press 'u' to show untracked files"
+				}
+				m.err = fmt.Errorf("%s", msg)
 			}
 		}
 
@@ -274,7 +285,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			// Select initial file (either specified via --file flag or default to first)
-			m.selectedFile = 0
+			// Only reset selection if we just loaded files and we weren't trying to preserve it?
+			// Logic here is simple: if m.initialFile is set, select it.
+			// But if we just toggled 'u', we might want to keep selection?
+			// For simplicity, let's just reset or try to keep index if valid.
+			if m.selectedFile >= len(m.files) {
+				m.selectedFile = 0
+			}
+			
 			if m.initialFile != "" {
 				// Find the specified file in the list
 				for i, file := range m.files {
@@ -408,7 +426,7 @@ func (m model) View() string {
 		searchInfo = "No matches found"
 	}
 
-	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext, focusOnFileList, m.searchMode, searchInfo, m.winWidth)
+	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext, focusOnFileList, m.searchMode, m.showUntracked, searchInfo, m.winWidth)
 
 	// Show search input if in search mode
 	var searchBar string
@@ -469,9 +487,9 @@ func convertSearchMatches(matches []search.Match, currentMatchIdx int) []ui.Sear
 	return result
 }
 
-func loadFilesCmd(mode git.DiffMode, _ string) tea.Cmd {
+func loadFilesCmd(mode git.DiffMode, _ string, includeUntracked bool) tea.Cmd {
 	return func() tea.Msg {
-		files, err := git.GetModifiedFiles(mode)
+		files, err := git.GetModifiedFiles(mode, includeUntracked)
 		return filesLoadedMsg{files: files, err: err}
 	}
 }

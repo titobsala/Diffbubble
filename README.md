@@ -7,13 +7,14 @@
 
 A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, customizable themes, search functionality, and beautiful color-coded statistics.
 
-> **Note:** Currently at v0.3.3. Fixes UI layout issue where header was obscured and improves compatibility with different terminal sizes.
+> **Note:** Currently at v0.4.0. Adds support for viewing untracked files!
 
 ## Features
 
 - **Multi-file navigation**: Sidebar showing all modified files with colored stats
 - **Side-by-side diff display**: View old and new versions simultaneously
 - **Synchronized scrolling**: Both panes scroll together for easy comparison
+- **Untracked files support**: Toggle display of new/untracked files with 'u'
 - **Search functionality**: Press '/' to search, real-time highlighting, navigate with 'n'/'N'
 - **Customizable themes**: 9 built-in themes with interactive cycling (press 't')
 - **Configuration file support**: User and per-repository config files
@@ -215,6 +216,7 @@ diffbubble --show-theme-colors dracula
 ### Toggles
 -   **Line numbers:** Press `n` to toggle line numbers on/off (or next match when search is active)
 -   **Context mode:** Press `c` to toggle between focus mode (changes only) and full context (entire file)
+-   **Untracked files:** Press `u` to toggle display of untracked files
 -   **Theme cycling:** Press `t` to cycle through all available themes interactively
 
 ### General
