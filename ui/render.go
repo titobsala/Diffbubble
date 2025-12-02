@@ -250,6 +250,8 @@ func statusIcon(status git.FileStatus) string {
 		return StatusDeletedStyle.Render("D")
 	case git.StatusRenamed:
 		return StatusModifiedStyle.Render("R")
+	case git.StatusUntracked:
+		return StatusUntrackedStyle.Render("?")
 	}
 	return "?"
 }
@@ -263,7 +265,7 @@ func truncate(s string, maxLen int) string {
 
 // RenderFooter renders the footer with keyboard shortcuts and feature states.
 // searchInfo format: "Match X of Y" or empty string if no search
-func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, searchMode bool, searchInfo string, termWidth int) string {
+func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, searchMode bool, showUntracked bool, searchInfo string, termWidth int) string {
 	lineNumHint := "on"
 	if !showLineNumbers {
 		lineNumHint = "off"
@@ -277,6 +279,11 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, 
 	focusHint := "diff"
 	if focusOnFileList {
 		focusHint = "files"
+	}
+
+	untrackedHint := "hide"
+	if showUntracked {
+		untrackedHint = "show"
 	}
 
 	var text string
@@ -296,18 +303,20 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, 
 		if termWidth < 120 {
 			// Shortened version for narrow terminals
 			text = fmt.Sprintf(
-				"tab:pane(%s) • j/k:nav • n:nums(%s) • c:ctx(%s) • t:theme • /:search • q:quit",
+				"tab:%s • j/k:nav • n:nums(%s) • c:ctx(%s) • u:new(%s) • /:find • q:quit",
 				focusHint,
 				lineNumHint,
 				contextHint,
+				untrackedHint,
 			)
 		} else {
 			// Full version for wider terminals
 			text = fmt.Sprintf(
-				"tab: switch pane (%s) • j/k: scroll/navigate • n: line numbers (%s) • c: context (%s) • t: cycle theme • /: search • q/esc: quit",
+				"tab: switch pane (%s) • j/k: scroll/navigate • n: numbers (%s) • c: context (%s) • u: untracked (%s) • /: search • q/esc: quit",
 				focusHint,
 				lineNumHint,
 				contextHint,
+				untrackedHint,
 			)
 		}
 	}

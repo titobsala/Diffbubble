@@ -26,6 +26,7 @@ const (
 	StatusAdded
 	StatusDeleted
 	StatusRenamed
+	StatusUntracked
 	StatusUnknown
 )
 
@@ -49,7 +50,7 @@ func Diff() ([]byte, error) {
 }
 
 // GetModifiedFiles returns a list of all files with changes and their stats.
-func GetModifiedFiles(mode DiffMode) ([]FileStat, error) {
+func GetModifiedFiles(mode DiffMode, includeUntracked bool) ([]FileStat, error) {
 	// Build git diff arguments based on mode
 	var diffArgs []string
 	switch mode {
@@ -141,6 +142,40 @@ func GetModifiedFiles(mode DiffMode) ([]FileStat, error) {
 		files = append(files, stat)
 	}
 
+	// Fetch untracked files if requested
+	if includeUntracked {
+		untrackedCmd := exec.Command("git", "ls-files", "--others", "--exclude-standard")
+		untrackedOut, err := untrackedCmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("running git ls-files: %w", err)
+		}
+
+		scanner = bufio.NewScanner(bytes.NewReader(untrackedOut))
+		for scanner.Scan() {
+			path := scanner.Text()
+			if path == "" {
+				continue
+			}
+
+			// For untracked files, we need to count lines manually or via wc -l
+			// to approximate "additions"
+			lineCount := 0
+			if countOut, err := exec.Command("wc", "-l", path).Output(); err == nil {
+				parts := strings.Fields(string(countOut))
+				if len(parts) > 0 {
+					lineCount, _ = strconv.Atoi(parts[0])
+				}
+			}
+
+			files = append(files, FileStat{
+				Path:      path,
+				Status:    StatusUntracked,
+				Additions: lineCount,
+				Deletions: 0,
+			})
+		}
+	}
+
 	return files, nil
 }
 
@@ -148,33 +183,56 @@ func GetModifiedFiles(mode DiffMode) ([]FileStat, error) {
 // contextLines specifies how many context lines to show (0 for default, -1 for full file)
 // mode specifies which changes to show (staged, unstaged, or all)
 func GetFileDiff(filepath string, contextLines int, mode DiffMode) ([]byte, error) {
-	// Build base command arguments based on mode
+	// Check if file is untracked
+	isUntracked := false
+	checkCmd := exec.Command("git", "ls-files", "--error-unmatch", filepath)
+	if err := checkCmd.Run(); err != nil {
+		// Error means it's not tracked (exit code 1)
+		isUntracked = true
+	}
+
 	var args []string
-	switch mode {
-	case DiffStaged:
-		args = []string{"diff", "--cached"}
-	case DiffUnstaged:
-		args = []string{"diff"}
-	default: // DiffAll
-		args = []string{"diff", "HEAD"}
-	}
+	if isUntracked {
+		// Use --no-index to compare against /dev/null
+		args = []string{"diff", "--no-index"}
+		// Add context argument
+		if contextLines == -1 {
+			args = append(args, "-U999999")
+		} else if contextLines > 0 {
+			args = append(args, fmt.Sprintf("-U%d", contextLines))
+		}
+		args = append(args, "--", "/dev/null", filepath)
+	} else {
+		// Normal diff
+		switch mode {
+		case DiffStaged:
+			args = []string{"diff", "--cached"}
+		case DiffUnstaged:
+			args = []string{"diff"}
+		default: // DiffAll
+			args = []string{"diff", "HEAD"}
+		}
 
-	// Add context argument
-	if contextLines == -1 {
-		// Full context mode - show entire file
-		args = append(args, "-U999999")
-	} else if contextLines > 0 {
-		// Custom context lines
-		args = append(args, fmt.Sprintf("-U%d", contextLines))
-	}
-	// else use default context (usually 3 lines)
+		// Add context argument
+		if contextLines == -1 {
+			args = append(args, "-U999999")
+		} else if contextLines > 0 {
+			args = append(args, fmt.Sprintf("-U%d", contextLines))
+		}
 
-	// Add filepath
-	args = append(args, "--", filepath)
+		args = append(args, "--", filepath)
+	}
 
 	cmd := exec.Command("git", args...)
 	out, err := cmd.Output()
+
+	// git diff exits with 1 if there are differences, which is not an error for us
 	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			if exitError.ExitCode() == 1 {
+				return out, nil
+			}
+		}
 		return nil, fmt.Errorf("running git diff for %s: %w", filepath, err)
 	}
 	return out, nil
