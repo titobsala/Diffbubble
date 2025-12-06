@@ -100,7 +100,7 @@ release:
 
     #### Using Go
     ```bash
-    go install github.com/titobsala/Diffbubble@{{ .Tag }}
+    go install github.com/titobsala/diffbubble@{{ .Tag }}
     ```
 
     #### Download Binary

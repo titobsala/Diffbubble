@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/titobsala/Diffbubble/config"
-	"github.com/titobsala/Diffbubble/git"
-	"github.com/titobsala/Diffbubble/parser"
-	"github.com/titobsala/Diffbubble/search"
-	"github.com/titobsala/Diffbubble/ui"
+	"github.com/titobsala/diffbubble/config"
+	"github.com/titobsala/diffbubble/git"
+	"github.com/titobsala/diffbubble/parser"
+	"github.com/titobsala/diffbubble/search"
+	"github.com/titobsala/diffbubble/ui"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -21,7 +21,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.4.0"
+	version  = "0.4.1"
 )
 
 type focusPane int

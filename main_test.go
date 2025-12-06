@@ -5,7 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/titobsala/Diffbubble/ui"
+	"github.com/titobsala/diffbubble/ui"
 )
 
 func TestUpdateSearchStyles(t *testing.T) {

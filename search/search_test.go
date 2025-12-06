@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"github.com/titobsala/Diffbubble/parser"
+	"github.com/titobsala/diffbubble/parser"
 )
 
 func TestSearchInRows_Overlap(t *testing.T) {

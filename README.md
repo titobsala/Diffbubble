@@ -7,7 +7,7 @@
 
 A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, customizable themes, search functionality, and beautiful color-coded statistics.
 
-> **Note:** Currently at v0.4.0. Adds support for viewing untracked files!
+> **Note:** Currently at v0.4.1. Module renamed to lowercase for consistency.
 
 ## Features
 
@@ -51,7 +51,7 @@ sudo mv diffbubble /usr/local/bin/
 If you have Go installed, you can install diffbubble directly:
 
 ```sh
-go install github.com/titobsala/Diffbubble@latest
+go install github.com/titobsala/diffbubble@latest
 ```
 
 **Note:** Make sure `$GOPATH/bin` (typically `~/go/bin`) is in your PATH. Add this to your shell config:
