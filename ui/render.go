@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/titobsala/Diffbubble/git"
-	"github.com/titobsala/Diffbubble/parser"
+	"github.com/titobsala/diffbubble/git"
+	"github.com/titobsala/diffbubble/parser"
 )
 
 // SearchMatch represents a search match for highlighting

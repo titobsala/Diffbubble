@@ -3,7 +3,7 @@ package search
 import (
 	"strings"
 
-	"github.com/titobsala/Diffbubble/parser"
+	"github.com/titobsala/diffbubble/parser"
 )
 
 // Match represents a search match in the diff.

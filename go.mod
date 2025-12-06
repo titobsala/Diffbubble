@@ -1,4 +1,4 @@
-module github.com/titobsala/Diffbubble
+module github.com/titobsala/diffbubble
 
 go 1.25.0
 
