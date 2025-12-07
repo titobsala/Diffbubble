@@ -826,8 +826,8 @@ func main() {
 	ti.Width = 50
 	updateSearchStyles(&ti)
 
-	// Select random animation type
-	animType := rand.Intn(3)
+	// Select random animation type (0=Glitch, 1=Scan)
+	animType := rand.Intn(2)
 
 	p := tea.NewProgram(
 		model{

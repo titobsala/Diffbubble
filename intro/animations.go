@@ -16,8 +16,6 @@ func RenderAnimation(animType AnimationType, frame, width, height int) string {
 		return renderGlitch(frame, width, height)
 	case Scan:
 		return renderScan(frame, width, height)
-	case Stream:
-		return renderStream(frame, width, height)
 	default:
 		return renderGlitch(frame, width, height)
 	}
@@ -375,90 +373,4 @@ func renderScan(frame, width, height int) string {
 
 	// Center the content
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
-}
-
-// renderStream renders the "Commit Stream" Matrix-style animation
-func renderStream(frame, width, height int) string {
-	theme := ui.GetTheme()
-
-	// Initialize streams on first frame (simulated with deterministic positions)
-	catHeight := len(PixelCatLookingUp)
-	catY := height - catHeight - 2 // Position cat near bottom
-
-	// Create symbol streams
-	symbols := []string{"+", "-", "~", "a1b", "2c3", "d4e"}
-	colors := []string{theme.AdditionFg, theme.DeletionFg, "#FFFF00", "#00FFFF", "#00FFFF", "#00FFFF"}
-
-	// Calculate stream positions (deterministic based on frame)
-	numStreams := 12
-	streams := make([]SymbolStream, numStreams)
-	for i := 0; i < numStreams; i++ {
-		streams[i] = SymbolStream{
-			X:      (i * (width / numStreams)) + (frame%3)*2 - 2, // Slight horizontal movement
-			Y:      -i*3 + (frame / 2),                            // Different start times
-			Speed:  2,
-			Symbol: symbols[i%len(symbols)],
-			Color:  colors[i%len(colors)],
-		}
-	}
-
-	// Create a grid to place symbols
-	grid := make([][]string, height)
-	for y := 0; y < height; y++ {
-		grid[y] = make([]string, width)
-		for x := 0; x < width; x++ {
-			grid[y][x] = " "
-		}
-	}
-
-	// Draw streams
-	for _, stream := range streams {
-		if stream.Y >= 0 && stream.Y < height && stream.X >= 0 && stream.X < width {
-			style := lipgloss.NewStyle().Foreground(lipgloss.Color(stream.Color))
-			grid[stream.Y][stream.X] = style.Render(stream.Symbol)
-		}
-	}
-
-	// Draw PixelCat at bottom
-	catStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
-	// Glow effect: brightness increases with frame
-	if frame > 20 {
-		catStyle = catStyle.Bold(true)
-	}
-
-	catX := (width - len(PixelCatLookingUp[0])) / 2
-	for i, line := range PixelCatLookingUp {
-		y := catY + i
-		if y >= 0 && y < height {
-			for j, char := range line {
-				x := catX + j
-				if x >= 0 && x < width {
-					grid[y][x] = catStyle.Render(string(char))
-				}
-			}
-		}
-	}
-
-	// Convert grid to string
-	var lines []string
-	for _, row := range grid {
-		lines = append(lines, strings.Join(row, ""))
-	}
-	gridStr := strings.Join(lines, "\n")
-
-	// Status text
-	statusText := "LOADING COMMIT HISTORY..."
-	if frame%20 == 10 {
-		statusText = "⚠ force-push detected!"
-	}
-
-	// Screen shake for force-push
-	shake := 0
-	if frame%20 >= 10 && frame%20 <= 12 {
-		shake = 2
-	}
-
-	content := strings.Repeat(" ", shake) + gridStr + "\n\n" + statusText
-
-	return content
 }
