@@ -25,12 +25,12 @@ type SymbolStream struct {
 func GetMaxFrames(animType AnimationType) int {
 	switch animType {
 	case Glitch:
-		return 30 // ~1.5 seconds at 20 FPS
+		return 35 // ~1.75 seconds at 20 FPS (5 phases)
 	case Scan:
 		return 40 // ~2 seconds at 20 FPS
 	case Stream:
 		return 50 // ~2.5 seconds at 20 FPS
 	default:
-		return 30
+		return 35
 	}
 }
