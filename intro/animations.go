@@ -290,9 +290,9 @@ func renderGlitch(frame, width, height int) string {
 		// Separate into RGB channels with increasing shift
 		shiftAmount := 3 + (frame-16)/2 // Increases from 3 to 7
 
-		redChannel := shiftLines(PixelCat, -shiftAmount, true)  // left
-		greenChannel := shiftLines(PixelCat, 0, false)          // center
-		cyanChannel := shiftLines(PixelCat, shiftAmount, true)  // right
+		redChannel := shiftLines(PixelCat, -shiftAmount, true) // left
+		greenChannel := shiftLines(PixelCat, 0, false)         // center
+		cyanChannel := shiftLines(PixelCat, shiftAmount, true) // right
 
 		// Apply line displacement for tearing effect
 		redChannel = applyLineDisplacement(redChannel, frame)
