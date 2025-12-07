@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/titobsala/diffbubble/config"
 	"github.com/titobsala/diffbubble/git"
+	"github.com/titobsala/diffbubble/intro"
 	"github.com/titobsala/diffbubble/parser"
 	"github.com/titobsala/diffbubble/search"
 	"github.com/titobsala/diffbubble/ui"
@@ -21,7 +24,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.4.1"
+	version  = "0.4.3"
 )
 
 type focusPane int
@@ -64,6 +67,12 @@ type model struct {
 	searchMatches    []search.Match  // All matches found
 	currentMatchIdx  int             // Index of current match being viewed (-1 if none)
 	searchInAllFiles bool            // Whether to search across all files
+
+	// Intro animation state
+	introPhase         int // 0=intro animation, 1=main app
+	animationType      int // 0=glitch, 1=scan, 2=stream
+	animationFrame     int // current frame counter
+	animationMaxFrames int // total frames for selected animation
 }
 
 // Message types for async operations
@@ -77,8 +86,21 @@ type fileDiffLoadedMsg struct {
 	err  error
 }
 
+// tickMsg is sent periodically for intro animation frames
+type tickMsg time.Time
+
 func (m model) Init() tea.Cmd {
-	return loadFilesCmd(m.diffMode, m.initialFile, m.showUntracked)
+	return tea.Batch(
+		loadFilesCmd(m.diffMode, m.initialFile, m.showUntracked),
+		tick(), // Start animation ticker
+	)
+}
+
+// tick returns a command that sends tickMsg after a delay
+func tick() tea.Cmd {
+	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -88,6 +110,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	)
 
 	switch msg := msg.(type) {
+	case tickMsg:
+		// Handle intro animation ticks
+		if m.introPhase == 0 {
+			m.animationFrame++
+			if m.animationFrame >= m.animationMaxFrames {
+				m.introPhase = 1 // Transition to main app
+				return m, nil
+			}
+			return m, tick() // Continue animation
+		}
+		return m, nil
+
 	case tea.KeyMsg:
 		k := msg.String()
 
@@ -401,6 +435,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	// Show intro animation if in intro phase
+	if m.introPhase == 0 {
+		return intro.RenderAnimation(
+			intro.AnimationType(m.animationType),
+			m.animationFrame,
+			m.winWidth,
+			m.winHeight,
+		)
+	}
+
 	if !m.ready {
 		return "\n  Initializing..."
 	}
@@ -782,17 +826,24 @@ func main() {
 	ti.Width = 50
 	updateSearchStyles(&ti)
 
+	// Select random animation type (0=Glitch, 1=Scan)
+	animType := rand.Intn(2)
+
 	p := tea.NewProgram(
 		model{
-			showLineNumbers:  cfg.LineNumbers, // From config
-			fullContext:      fullContext,     // From config
-			focus:            focusFileList,
-			diffMode:         diffMode,
-			initialFile:      selectedFile,
-			currentThemeIdx:  themeIdx,
-			searchInput:      ti,
-			currentMatchIdx:  -1,   // No match selected initially
-			searchInAllFiles: true, // Default to searching all files
+			showLineNumbers:    cfg.LineNumbers, // From config
+			fullContext:        fullContext,     // From config
+			focus:              focusFileList,
+			diffMode:           diffMode,
+			initialFile:        selectedFile,
+			currentThemeIdx:    themeIdx,
+			searchInput:        ti,
+			currentMatchIdx:    -1,   // No match selected initially
+			searchInAllFiles:   true, // Default to searching all files
+			introPhase:         0,    // Start with intro animation
+			animationType:      animType,
+			animationFrame:     0,
+			animationMaxFrames: intro.GetMaxFrames(intro.AnimationType(animType)),
 		},
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
