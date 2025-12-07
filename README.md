@@ -7,12 +7,13 @@
 
 A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, customizable themes, search functionality, and beautiful color-coded statistics.
 
-> **Note:** Currently at v0.4.1.
+> **Note:** Currently at v0.4.2.
 
 ![diffbubble demo](public/diffbubble.gif)
 
 ## Features
 
+- **Intro animations**: Fun ASCII animations on startup (3 random variations: Glitch, Scan, Stream)
 - **Multi-file navigation**: Sidebar showing all modified files with colored stats
 - **Side-by-side diff display**: View old and new versions simultaneously
 - **Synchronized scrolling**: Both panes scroll together for easy comparison
