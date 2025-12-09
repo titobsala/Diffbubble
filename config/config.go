@@ -9,11 +9,12 @@ import (
 
 // Config represents the user configuration
 type Config struct {
-	Theme       string      `yaml:"theme"`
-	LineNumbers bool        `yaml:"line_numbers"`
-	ContextMode string      `yaml:"context_mode"` // "focus" or "full"
-	DiffMode    string      `yaml:"diff_mode"`    // "all", "staged", "unstaged"
-	KeyBindings KeyBindings `yaml:"key_bindings,omitempty"`
+	Theme         string      `yaml:"theme"`
+	LineNumbers   bool        `yaml:"line_numbers"`
+	ContextMode   string      `yaml:"context_mode"`   // "focus" or "full"
+	DiffMode      string      `yaml:"diff_mode"`      // "all", "staged", "unstaged"
+	CompareBranch string      `yaml:"compare_branch"` // Default branch for comparison (empty = no default)
+	KeyBindings   KeyBindings `yaml:"key_bindings,omitempty"`
 }
 
 // KeyBindings defines custom key bindings
@@ -29,11 +30,12 @@ type KeyBindings struct {
 // DefaultConfig returns the default configuration
 func DefaultConfig() Config {
 	return Config{
-		Theme:       "dark",
-		LineNumbers: true,
-		ContextMode: "focus",
-		DiffMode:    "all",
-		KeyBindings: DefaultKeyBindings(),
+		Theme:         "dark",
+		LineNumbers:   true,
+		ContextMode:   "focus",
+		DiffMode:      "all",
+		CompareBranch: "", // No default comparison branch
+		KeyBindings:   DefaultKeyBindings(),
 	}
 }
 
