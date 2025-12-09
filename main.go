@@ -69,14 +69,14 @@ type model struct {
 	searchInAllFiles bool            // Whether to search across all files
 
 	// Branch comparison state
-	compareBranch      string              // Target branch for comparison
-	previousDiffMode   git.DiffMode        // Mode before entering branch comparison
-	branchSelectorMode bool                // Whether branch selector panel is active
-	branchInput        textinput.Model     // Text input for filtering branches
-	branchList         []string            // All available branches
-	filteredBranches   []string            // Filtered based on input
-	selectedBranchIdx  int                 // Selected branch index
-	currentBranch      string              // Current branch name
+	compareBranch      string          // Target branch for comparison
+	previousDiffMode   git.DiffMode    // Mode before entering branch comparison
+	branchSelectorMode bool            // Whether branch selector panel is active
+	branchInput        textinput.Model // Text input for filtering branches
+	branchList         []string        // All available branches
+	filteredBranches   []string        // Filtered based on input
+	selectedBranchIdx  int             // Selected branch index
+	currentBranch      string          // Current branch name
 
 	// Intro animation state
 	introPhase         int // 0=intro animation, 1=main app
@@ -178,7 +178,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case "enter":
 				// Select branch and enter comparison mode
-				if len(m.filteredBranches) > 0 && m.selectedBranchIdx >= 0 && m.selectedBranchIdx < len(m.filteredBranches) {
+				if m.filteredBranches != nil && len(m.filteredBranches) > 0 && m.selectedBranchIdx >= 0 && m.selectedBranchIdx < len(m.filteredBranches) {
 					selectedBranch := m.filteredBranches[m.selectedBranchIdx]
 
 					// Save previous mode to restore later
@@ -200,14 +200,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case "j", "down":
 				// Navigate to next branch
-				if m.selectedBranchIdx < len(m.filteredBranches)-1 {
+				if m.filteredBranches != nil && len(m.filteredBranches) > 0 && m.selectedBranchIdx < len(m.filteredBranches)-1 {
 					m.selectedBranchIdx++
 				}
 				return m, nil
 
 			case "k", "up":
 				// Navigate to previous branch
-				if m.selectedBranchIdx > 0 {
+				if m.filteredBranches != nil && len(m.filteredBranches) > 0 && m.selectedBranchIdx > 0 {
 					m.selectedBranchIdx--
 				}
 				return m, nil
@@ -679,8 +679,12 @@ func renderBranchSelector(m model) string {
 
 	// Branch list (show max 10)
 	maxDisplay := 10
-	if len(m.filteredBranches) == 0 {
-		sb.WriteString(ui.BranchListItemStyle.Render("No branches found"))
+	if m.filteredBranches == nil || len(m.filteredBranches) == 0 {
+		if m.branchList == nil || len(m.branchList) == 0 {
+			sb.WriteString(ui.BranchListItemStyle.Render("Loading branches..."))
+		} else {
+			sb.WriteString(ui.BranchListItemStyle.Render("No branches found"))
+		}
 	} else {
 		start := 0
 		if m.selectedBranchIdx > maxDisplay/2 && len(m.filteredBranches) > maxDisplay {
@@ -946,6 +950,12 @@ func (m *model) performSearch() {
 }
 
 func (m *model) filterBranches() {
+	// Don't filter if branches aren't loaded yet
+	if m.branchList == nil {
+		m.filteredBranches = nil
+		return
+	}
+
 	query := strings.ToLower(m.branchInput.Value())
 	if query == "" {
 		m.filteredBranches = m.branchList
@@ -1141,6 +1151,8 @@ func main() {
 			animationMaxFrames: intro.GetMaxFrames(intro.AnimationType(animType)),
 			compareBranch:      compareBranch,
 			branchInput:        branchInput,
+			branchList:         []string{},
+			filteredBranches:   []string{},
 			currentBranch:      currentBranch,
 			selectedBranchIdx:  0,
 		},

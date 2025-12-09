@@ -38,14 +38,14 @@ var (
 	SearchInputStyle        lipgloss.Style
 
 	// Branch selector styles
-	BranchSelectorBoxStyle      lipgloss.Style
-	BranchSelectorTitleStyle    lipgloss.Style
-	BranchSelectorInputStyle    lipgloss.Style
-	BranchSelectorFooterStyle   lipgloss.Style
-	CurrentBranchStyle          lipgloss.Style
-	SelectedBranchStyle         lipgloss.Style
-	BranchListItemStyle         lipgloss.Style
-	BranchCountStyle            lipgloss.Style
+	BranchSelectorBoxStyle    lipgloss.Style
+	BranchSelectorTitleStyle  lipgloss.Style
+	BranchSelectorInputStyle  lipgloss.Style
+	BranchSelectorFooterStyle lipgloss.Style
+	CurrentBranchStyle        lipgloss.Style
+	SelectedBranchStyle       lipgloss.Style
+	BranchListItemStyle       lipgloss.Style
+	BranchCountStyle          lipgloss.Style
 )
 
 // updateStyles applies the current theme to all styles
