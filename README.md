@@ -7,7 +7,7 @@
 
 A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, customizable themes, search functionality, and beautiful color-coded statistics.
 
-> **Note:** Currently at v0.4.3.
+> **Note:** Currently at v0.5.0.
 
 ![diffbubble demo](public/diffbubble.gif)
 
@@ -19,6 +19,7 @@ A Terminal User Interface (TUI) application written in Go to display a side-by-s
 - **Multi-file navigation**: Sidebar showing all modified files with colored stats
 - **Side-by-side diff display**: View old and new versions simultaneously
 - **Synchronized scrolling**: Both panes scroll together for easy comparison
+- **Branch comparison**: Compare current branch against any other branch (local or remote)
 - **Untracked files support**: Toggle display of new/untracked files with 'u'
 - **Search functionality**: Press '/' to search, real-time highlighting, navigate with 'n'/'N'
 - **Customizable themes**: 9 built-in themes with interactive cycling (press 't')
@@ -173,6 +174,8 @@ diffbubble [flags]
 - `--file=<filename>` - Open with specific file selected
 - `--staged` - Show only staged changes (git diff --cached)
 - `--unstaged` - Show only unstaged changes
+- `--compare=<branch>` - Compare current branch to specified branch
+- `--branch=<branch>` - Alias for --compare
 - `--theme=<name>` - Set color theme (default: dark)
 - `--list-themes` - List all available themes
 - `--show-theme-colors <name>` - Preview colors for a specific theme
@@ -190,6 +193,12 @@ diffbubble --unstaged
 
 # Open with README.md selected
 diffbubble --file=README.md
+
+# Compare current branch to main
+diffbubble --compare=main
+
+# Compare to remote branch
+diffbubble --compare=origin/develop
 
 # Use a specific theme
 diffbubble --theme=catppuccin
@@ -217,6 +226,14 @@ diffbubble --show-theme-colors dracula
 -   **Navigate matches:** Press `n` for next match, `N` for previous match
 -   **Exit search:** Press `Esc` to cancel search mode
 -   **Match status:** Current match shown in gold/underline, others in orange; footer shows "Match X of Y"
+
+### Branch Comparison
+-   **Open branch selector:** Press `b` to open branch selector modal
+-   **Filter branches:** Type to filter branches (case-insensitive)
+-   **Navigate branches:** Use `j`/`k` or `↑`/`↓` to select a branch
+-   **Compare:** Press `Enter` to compare current branch with selected branch
+-   **Cancel:** Press `Esc` to close branch selector without selecting
+-   **Exit comparison:** Press `x` to exit branch comparison mode and return to normal diff view
 
 ### Toggles
 -   **Line numbers:** Press `n` to toggle line numbers on/off (or next match when search is active)
