@@ -79,10 +79,10 @@ type model struct {
 	currentBranch      string          // Current branch name
 
 	// Intro animation state
-	introPhase         int // 0=intro animation, 1=main app
-	animationType      int // 0=glitch, 1=scan, 2=stream
-	animationFrame     int // current frame counter
-	animationMaxFrames int // total frames for selected animation
+	introPhase         int
+	animationType      int
+	animationFrame     int
+	animationMaxFrames int
 }
 
 // Message types for async operations
@@ -178,7 +178,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case "enter":
 				// Select branch and enter comparison mode
-				if m.filteredBranches != nil && len(m.filteredBranches) > 0 && m.selectedBranchIdx >= 0 && m.selectedBranchIdx < len(m.filteredBranches) {
+				if len(m.filteredBranches) > 0 && m.selectedBranchIdx >= 0 && m.selectedBranchIdx < len(m.filteredBranches) {
 					selectedBranch := m.filteredBranches[m.selectedBranchIdx]
 
 					// Save previous mode to restore later
@@ -200,14 +200,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case "j", "down":
 				// Navigate to next branch
-				if m.filteredBranches != nil && len(m.filteredBranches) > 0 && m.selectedBranchIdx < len(m.filteredBranches)-1 {
+				if m.selectedBranchIdx < len(m.filteredBranches)-1 {
 					m.selectedBranchIdx++
 				}
 				return m, nil
 
 			case "k", "up":
 				// Navigate to previous branch
-				if m.filteredBranches != nil && len(m.filteredBranches) > 0 && m.selectedBranchIdx > 0 {
+				if m.selectedBranchIdx > 0 {
 					m.selectedBranchIdx--
 				}
 				return m, nil
@@ -414,11 +414,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.fileListView.SetContent(ui.RenderFileList(m.files, m.selectedFile))
 			}
 
-			// Select initial file (either specified via --file flag or default to first)
-			// Only reset selection if we just loaded files and we weren't trying to preserve it?
 			// Logic here is simple: if m.initialFile is set, select it.
-			// But if we just toggled 'u', we might want to keep selection?
-			// For simplicity, let's just reset or try to keep index if valid.
 			if m.selectedFile >= len(m.files) {
 				m.selectedFile = 0
 			}
@@ -476,18 +472,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.winWidth = msg.Width
 		m.winHeight = msg.Height
 
-		// Calculate dimensions: 20-40-40 split
-		// Increased margin to account for header, footer, borders, and potential text wrapping
-		headerHeight := 3 // Title + margin + buffer
-		footerHeight := 3 // Footer can wrap to 2-3 lines in narrow terminals
-		borderHeight := 2 // Top and bottom borders for viewports
+		headerHeight := 3
+		footerHeight := 3
+		borderHeight := 2
 		verticalMarginHeight := headerHeight + footerHeight + borderHeight
 
-		// 20% for sidebar, 40% for each diff pane
 		sidebarWidth := msg.Width * 20 / 100
 		diffPaneWidth := msg.Width * 40 / 100
 
-		// Account for borders (subtract a bit for padding)
 		if sidebarWidth > 4 {
 			sidebarWidth -= 4
 		}
@@ -498,12 +490,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.ready {
 			m.ready = true
 
-			// Initialize three viewports
 			m.fileListView = viewport.New(sidebarWidth, msg.Height-verticalMarginHeight)
 			m.leftView = viewport.New(diffPaneWidth, msg.Height-verticalMarginHeight)
 			m.rightView = viewport.New(diffPaneWidth, msg.Height-verticalMarginHeight)
 		} else {
-			// Handle resize
 			m.fileListView.Width = sidebarWidth
 			m.fileListView.Height = msg.Height - verticalMarginHeight
 			m.leftView.Width = diffPaneWidth
@@ -512,18 +502,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.rightView.Height = msg.Height - verticalMarginHeight
 		}
 
-		// Update file list content
 		if len(m.files) > 0 {
 			m.fileListView.SetContent(ui.RenderFileList(m.files, m.selectedFile))
 		}
 	}
 
-	// Update viewports based on focus
 	if m.focus == focusFileList {
 		m.fileListView, cmd = m.fileListView.Update(msg)
 		cmds = append(cmds, cmd)
 	} else {
-		// Sync scrolling for diff panes
 		m.leftView, cmd = m.leftView.Update(msg)
 		cmds = append(cmds, cmd)
 
@@ -531,7 +518,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rightView.YOffset = m.leftView.YOffset
 	}
 
-	// Decrement theme change message counter
 	if m.themeChangeTicks > 0 {
 		m.themeChangeTicks--
 		if m.themeChangeTicks == 0 {
@@ -543,7 +529,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	// Show intro animation if in intro phase
 	if m.introPhase == 0 {
 		return intro.RenderAnimation(
 			intro.AnimationType(m.animationType),
@@ -679,12 +664,8 @@ func renderBranchSelector(m model) string {
 
 	// Branch list (show max 10)
 	maxDisplay := 10
-	if m.filteredBranches == nil || len(m.filteredBranches) == 0 {
-		if m.branchList == nil || len(m.branchList) == 0 {
-			sb.WriteString(ui.BranchListItemStyle.Render("Loading branches..."))
-		} else {
-			sb.WriteString(ui.BranchListItemStyle.Render("No branches found"))
-		}
+	if len(m.filteredBranches) == 0 {
+		sb.WriteString(ui.BranchListItemStyle.Render("No branches found"))
 	} else {
 		start := 0
 		if m.selectedBranchIdx > maxDisplay/2 && len(m.filteredBranches) > maxDisplay {
@@ -950,12 +931,6 @@ func (m *model) performSearch() {
 }
 
 func (m *model) filterBranches() {
-	// Don't filter if branches aren't loaded yet
-	if m.branchList == nil {
-		m.filteredBranches = nil
-		return
-	}
-
 	query := strings.ToLower(m.branchInput.Value())
 	if query == "" {
 		m.filteredBranches = m.branchList
@@ -1151,8 +1126,6 @@ func main() {
 			animationMaxFrames: intro.GetMaxFrames(intro.AnimationType(animType)),
 			compareBranch:      compareBranch,
 			branchInput:        branchInput,
-			branchList:         []string{},
-			filteredBranches:   []string{},
 			currentBranch:      currentBranch,
 			selectedBranchIdx:  0,
 		},
