@@ -474,8 +474,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.branchList = msg.branches
 			m.currentBranch = msg.currentBranch
-			m.filteredBranches = msg.branches
-			m.selectedBranchIdx = 0
+			m.filterBranches() // Reapply any existing filter from branchInput
 		}
 		return m, nil
 
@@ -606,36 +605,36 @@ func (m model) View() string {
 		}
 	} else {
 
-	// Render file list sidebar with focus-aware styling
-	fileListContent := m.fileListView.View()
-	var sidebarBox string
-	if focusOnFileList {
-		sidebarBox = ui.FileListStyleFocused.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
-	} else {
-		sidebarBox = ui.FileListStyle.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
-	}
+		// Render file list sidebar with focus-aware styling
+		fileListContent := m.fileListView.View()
+		var sidebarBox string
+		if focusOnFileList {
+			sidebarBox = ui.FileListStyleFocused.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
+		} else {
+			sidebarBox = ui.FileListStyle.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
+		}
 
-	// Render diff panes with focus-aware styling
-	var leftBox, rightBox string
-	if focusOnFileList {
-		// Diff panes are unfocused
-		leftBox = ui.BorderStyleUnfocused.Width(m.leftView.Width).Render(m.leftView.View())
-		rightBox = ui.BorderStyleUnfocused.Width(m.rightView.Width).Render(m.rightView.View())
-	} else {
-		// Diff panes are focused
-		leftBox = ui.BorderStyleFocused.Width(m.leftView.Width).Render(m.leftView.View())
-		rightBox = ui.BorderStyleFocused.Width(m.rightView.Width).Render(m.rightView.View())
-	}
+		// Render diff panes with focus-aware styling
+		var leftBox, rightBox string
+		if focusOnFileList {
+			// Diff panes are unfocused
+			leftBox = ui.BorderStyleUnfocused.Width(m.leftView.Width).Render(m.leftView.View())
+			rightBox = ui.BorderStyleUnfocused.Width(m.rightView.Width).Render(m.rightView.View())
+		} else {
+			// Diff panes are focused
+			leftBox = ui.BorderStyleFocused.Width(m.leftView.Width).Render(m.leftView.View())
+			rightBox = ui.BorderStyleFocused.Width(m.rightView.Width).Render(m.rightView.View())
+		}
 
-	// Join horizontally: sidebar | left diff | right diff
-	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebarBox, leftBox, rightBox)
+		// Join horizontally: sidebar | left diff | right diff
+		body := lipgloss.JoinHorizontal(lipgloss.Top, sidebarBox, leftBox, rightBox)
 
-	// Build base view from normal content
-	if searchBar != "" {
-		baseView = lipgloss.JoinVertical(lipgloss.Top, header, body, searchBar, footer)
-	} else {
-		baseView = lipgloss.JoinVertical(lipgloss.Top, header, body, footer)
-	}
+		// Build base view from normal content
+		if searchBar != "" {
+			baseView = lipgloss.JoinVertical(lipgloss.Top, header, body, searchBar, footer)
+		} else {
+			baseView = lipgloss.JoinVertical(lipgloss.Top, header, body, footer)
+		}
 	} // Close the else block from line 607
 
 	// Overlay branch selector if active
