@@ -382,6 +382,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Otherwise scroll diff
 		}
 
+		// BUGFIX: Prevent viewports from consuming keyboard events
+		// All keyboard handling is complete above - don't pass to viewports
+		return m, tea.Batch(cmds...)
+
 	case filesLoadedMsg:
 		m.files = msg.files
 		m.err = msg.err
@@ -394,16 +398,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if currentDisplay == "" {
 					currentDisplay = "(detached HEAD)"
 				}
-				m.err = fmt.Errorf("no differences found between '%s' and '%s'.\n\nThe branches may be identical, or you may be comparing a branch with itself.\n\nTry:\n  • Press 'b' to select a different branch\n  • Press 'x' to exit branch comparison mode", currentDisplay, m.compareBranch)
+				m.err = fmt.Errorf("no differences found between '%s' and '%s'.\n\nThe branches may be identical, or you may be comparing a branch with itself.\n\n✓ KEYBOARD SHORTCUTS AVAILABLE:\n  • Press 'b' to select a different branch\n  • Press 'x' to exit branch comparison mode\n  • Press 't' to change theme", currentDisplay, m.compareBranch)
 			case git.DiffStaged:
-				m.err = fmt.Errorf("no staged changes found.\n\nTry one of the following:\n  • Run 'git add <file>' to stage some changes\n  • Use --unstaged to see unstaged changes\n  • Remove --staged flag to see all changes")
+				m.err = fmt.Errorf("no staged changes found.\n\n✓ KEYBOARD SHORTCUTS AVAILABLE:\n  • Press 'b' to compare branches\n  • Press 't' to change theme\n\nOr:\n  • Run 'git add <file>' to stage changes\n  • Restart with --unstaged flag")
 			case git.DiffUnstaged:
-				m.err = fmt.Errorf("no unstaged changes found.\n\nTry one of the following:\n  • Use --staged to see staged changes\n  • Remove --unstaged flag to see all changes\n  • Make some changes to your working directory")
+				m.err = fmt.Errorf("no unstaged changes found.\n\n✓ KEYBOARD SHORTCUTS AVAILABLE:\n  • Press 'b' to compare branches\n  • Press 't' to change theme\n\nOr:\n  • Make changes to your working directory\n  • Restart with --staged flag to see staged changes")
 			default:
-				msg := "no changes found in the repository.\n\nMake sure you have:\n  • Modified some files in your working directory\n  • Staged some changes with 'git add'\n  • Checked that you're in a git repository"
+				msg := "no changes found in the repository.\n\n"
+				msg += "✓ KEYBOARD SHORTCUTS AVAILABLE:\n"
+				msg += "  • Press 'b' to compare with another branch\n"
 				if !m.showUntracked {
-					msg += "\n  • Press 'u' to show untracked files"
+					msg += "  • Press 'u' to show untracked files\n"
 				}
+				msg += "  • Press 't' to change theme\n"
+				msg += "\nOr make changes:\n"
+				msg += "  • Modify files in your working directory\n"
+				msg += "  • Stage changes with 'git add'\n"
+				msg += "  • Check that you're in a git repository"
 				m.err = fmt.Errorf("%s", msg)
 			}
 		}

@@ -68,9 +68,8 @@ func RenderSide(rows []parser.DiffRow, side Side, showLineNumbers bool, searchMa
 
 // ErrorBox renders a stylized error message that can be embedded inside the layout.
 func ErrorBox(err error, width int) string {
-	// Use error message as-is if it contains suggestions (multi-line with bullets)
 	message := err.Error()
-	if !strings.Contains(message, "•") {
+	if !strings.Contains(message, "•") && !strings.Contains(message, "✓") {
 		// For generic errors, add prefix
 		message = fmt.Sprintf("Unable to load git diff.\n\n%s", err)
 	}
@@ -78,6 +77,13 @@ func ErrorBox(err error, width int) string {
 	maxWidth := width - 6
 	if maxWidth < 20 {
 		maxWidth = 20
+	}
+
+	// Add visual header if message contains keyboard hints
+	if strings.Contains(message, "✓ KEYBOARD") {
+		header := "╭─── Tip: Keyboard shortcuts work! ───╮\n"
+		footer := "\n╰──────────────────────────────────────╯"
+		message = header + message + footer
 	}
 
 	return ErrorBoxStyle.MaxWidth(maxWidth).Render(message)
