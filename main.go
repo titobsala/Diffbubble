@@ -483,7 +483,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.winWidth = msg.Width
 		m.winHeight = msg.Height
 
-		headerHeight := 3
+		headerHeight := 4 // 3 lines for title + 1 line margin (TitleStyle.MarginBottom)
 		footerHeight := 3
 		borderHeight := 2
 		verticalMarginHeight := headerHeight + footerHeight + borderHeight
