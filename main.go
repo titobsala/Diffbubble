@@ -595,13 +595,16 @@ func (m model) View() string {
 		searchBar = ui.SearchInputStyle.Render(m.searchInput.View())
 	}
 
+	// Build base view - either error box or normal content
+	var baseView string
 	if m.err != nil {
 		errorBox := ui.ErrorBox(m.err, m.winWidth)
 		if searchBar != "" {
-			return lipgloss.JoinVertical(lipgloss.Top, header, errorBox, searchBar, footer)
+			baseView = lipgloss.JoinVertical(lipgloss.Top, header, errorBox, searchBar, footer)
+		} else {
+			baseView = lipgloss.JoinVertical(lipgloss.Top, header, errorBox, footer)
 		}
-		return lipgloss.JoinVertical(lipgloss.Top, header, errorBox, footer)
-	}
+	} else {
 
 	// Render file list sidebar with focus-aware styling
 	fileListContent := m.fileListView.View()
@@ -627,13 +630,13 @@ func (m model) View() string {
 	// Join horizontally: sidebar | left diff | right diff
 	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebarBox, leftBox, rightBox)
 
-	// Build base view
-	var baseView string
+	// Build base view from normal content
 	if searchBar != "" {
 		baseView = lipgloss.JoinVertical(lipgloss.Top, header, body, searchBar, footer)
 	} else {
 		baseView = lipgloss.JoinVertical(lipgloss.Top, header, body, footer)
 	}
+	} // Close the else block from line 607
 
 	// Overlay branch selector if active
 	if m.branchSelectorMode {
