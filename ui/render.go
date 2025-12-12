@@ -68,9 +68,8 @@ func RenderSide(rows []parser.DiffRow, side Side, showLineNumbers bool, searchMa
 
 // ErrorBox renders a stylized error message that can be embedded inside the layout.
 func ErrorBox(err error, width int) string {
-	// Use error message as-is if it contains suggestions (multi-line with bullets)
 	message := err.Error()
-	if !strings.Contains(message, "•") {
+	if !strings.Contains(message, "•") && !strings.Contains(message, "✓") {
 		// For generic errors, add prefix
 		message = fmt.Sprintf("Unable to load git diff.\n\n%s", err)
 	}
@@ -78,6 +77,13 @@ func ErrorBox(err error, width int) string {
 	maxWidth := width - 6
 	if maxWidth < 20 {
 		maxWidth = 20
+	}
+
+	// Add visual header if message contains keyboard hints
+	if strings.Contains(message, "✓ KEYBOARD") {
+		header := "╭─── Tip: Keyboard shortcuts work! ───╮\n"
+		footer := "\n╰──────────────────────────────────────╯"
+		message = header + message + footer
 	}
 
 	return ErrorBoxStyle.MaxWidth(maxWidth).Render(message)
@@ -265,7 +271,7 @@ func truncate(s string, maxLen int) string {
 
 // RenderFooter renders the footer with keyboard shortcuts and feature states.
 // searchInfo format: "Match X of Y" or empty string if no search
-func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, searchMode bool, showUntracked bool, searchInfo string, termWidth int) string {
+func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, searchMode bool, showUntracked bool, searchInfo string, branchCompareMode bool, termWidth int) string {
 	lineNumHint := "on"
 	if !showLineNumbers {
 		lineNumHint = "off"
@@ -298,12 +304,27 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, 
 		} else {
 			text = fmt.Sprintf("%s • n: next match • N: previous match • /: new search • esc: clear search", searchInfo)
 		}
+	} else if branchCompareMode {
+		// Branch comparison mode footer
+		if termWidth < 120 {
+			text = fmt.Sprintf(
+				"b:branches • x:exit • tab:%s • j/k:nav • n:nums(%s) • q:quit",
+				focusHint,
+				lineNumHint,
+			)
+		} else {
+			text = fmt.Sprintf(
+				"b: select branch • x: exit compare • tab: switch (%s) • j/k: navigate • n: numbers (%s) • /: search • q: quit",
+				focusHint,
+				lineNumHint,
+			)
+		}
 	} else {
 		// Normal footer
 		if termWidth < 120 {
 			// Shortened version for narrow terminals
 			text = fmt.Sprintf(
-				"tab:%s • j/k:nav • n:nums(%s) • c:ctx(%s) • u:new(%s) • /:find • q:quit",
+				"b:compare • tab:%s • j/k:nav • n:nums(%s) • c:ctx(%s) • u:new(%s) • /:find • q:quit",
 				focusHint,
 				lineNumHint,
 				contextHint,
@@ -312,7 +333,7 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, 
 		} else {
 			// Full version for wider terminals
 			text = fmt.Sprintf(
-				"tab: switch pane (%s) • j/k: scroll/navigate • n: numbers (%s) • c: context (%s) • u: untracked (%s) • /: search • q/esc: quit",
+				"b: branch compare • tab: switch (%s) • j/k: scroll • n: numbers (%s) • c: context (%s) • u: untracked (%s) • /: search • q/esc: quit",
 				focusHint,
 				lineNumHint,
 				contextHint,

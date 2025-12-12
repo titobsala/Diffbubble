@@ -68,11 +68,21 @@ type model struct {
 	currentMatchIdx  int             // Index of current match being viewed (-1 if none)
 	searchInAllFiles bool            // Whether to search across all files
 
+	// Branch comparison state
+	compareBranch      string          // Target branch for comparison
+	previousDiffMode   git.DiffMode    // Mode before entering branch comparison
+	branchSelectorMode bool            // Whether branch selector panel is active
+	branchInput        textinput.Model // Text input for filtering branches
+	branchList         []string        // All available branches
+	filteredBranches   []string        // Filtered based on input
+	selectedBranchIdx  int             // Selected branch index
+	currentBranch      string          // Current branch name
+
 	// Intro animation state
-	introPhase         int // 0=intro animation, 1=main app
-	animationType      int // 0=glitch, 1=scan, 2=stream
-	animationFrame     int // current frame counter
-	animationMaxFrames int // total frames for selected animation
+	introPhase         int
+	animationType      int
+	animationFrame     int
+	animationMaxFrames int
 }
 
 // Message types for async operations
@@ -86,12 +96,18 @@ type fileDiffLoadedMsg struct {
 	err  error
 }
 
+type branchesLoadedMsg struct {
+	branches      []string
+	currentBranch string
+	err           error
+}
+
 // tickMsg is sent periodically for intro animation frames
 type tickMsg time.Time
 
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
-		loadFilesCmd(m.diffMode, m.initialFile, m.showUntracked),
+		loadFilesCmd(m.diffMode, m.compareBranch, m.initialFile, m.showUntracked),
 		tick(), // Start animation ticker
 	)
 }
@@ -150,6 +166,61 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		// Handle branch selector mode input
+		if m.branchSelectorMode {
+			switch k {
+			case "esc":
+				// Cancel branch selection
+				m.branchSelectorMode = false
+				m.branchInput.Reset()
+				m.filteredBranches = nil
+				return m, nil
+
+			case "enter":
+				// Select branch and enter comparison mode
+				if len(m.filteredBranches) > 0 && m.selectedBranchIdx >= 0 && m.selectedBranchIdx < len(m.filteredBranches) {
+					selectedBranch := m.filteredBranches[m.selectedBranchIdx]
+
+					// Save previous mode to restore later
+					if m.diffMode != git.DiffBranch {
+						m.previousDiffMode = m.diffMode
+					}
+
+					// Enter branch comparison mode
+					m.diffMode = git.DiffBranch
+					m.compareBranch = selectedBranch
+					m.branchSelectorMode = false
+					m.branchInput.Reset()
+
+					// Reload files with new comparison
+					return m, loadFilesCmd(m.diffMode, m.compareBranch, "", m.showUntracked)
+				}
+				m.branchSelectorMode = false
+				return m, nil
+
+			case "j", "down":
+				// Navigate to next branch
+				if m.selectedBranchIdx < len(m.filteredBranches)-1 {
+					m.selectedBranchIdx++
+				}
+				return m, nil
+
+			case "k", "up":
+				// Navigate to previous branch
+				if m.selectedBranchIdx > 0 {
+					m.selectedBranchIdx--
+				}
+				return m, nil
+
+			default:
+				// Update text input and filter branches
+				var newCmd tea.Cmd
+				m.branchInput, newCmd = m.branchInput.Update(msg)
+				m.filterBranches()
+				return m, newCmd
+			}
+		}
+
 		// Normal mode key handling
 		switch k {
 		case "ctrl+c", "q":
@@ -185,6 +256,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.searchMode = true
 			m.searchInput.Focus()
 			m.searchInput.Reset()
+			return m, nil
+
+		case "b":
+			// Open branch selector
+			m.branchSelectorMode = true
+			m.branchInput.Focus()
+			m.branchInput.Reset()
+			m.selectedBranchIdx = 0
+			return m, loadBranchesCmd()
+
+		case "x":
+			// Exit branch comparison mode
+			if m.diffMode == git.DiffBranch {
+				m.diffMode = m.previousDiffMode
+				m.compareBranch = ""
+
+				// Reload files with previous mode
+				return m, loadFilesCmd(m.diffMode, "", "", m.showUntracked)
+			}
 			return m, nil
 
 		case "n":
@@ -227,7 +317,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.fullContext = !m.fullContext
 			// Reload current file's diff with new context
 			if len(m.files) > 0 && m.selectedFile >= 0 && m.selectedFile < len(m.files) {
-				return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode)
+				return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode, m.compareBranch)
 			}
 			return m, nil
 
@@ -235,7 +325,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Toggle untracked files visibility
 			m.showUntracked = !m.showUntracked
 			// Reload files
-			return m, loadFilesCmd(m.diffMode, "", m.showUntracked)
+			return m, loadFilesCmd(m.diffMode, m.compareBranch, "", m.showUntracked)
 
 		case "t":
 			// Cycle through themes
@@ -274,7 +364,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Navigate file list
 				if m.selectedFile < len(m.files)-1 {
 					m.selectedFile++
-					return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode)
+					return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode, m.compareBranch)
 				}
 				return m, nil
 			}
@@ -285,12 +375,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Navigate file list
 				if m.selectedFile > 0 {
 					m.selectedFile--
-					return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode)
+					return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode, m.compareBranch)
 				}
 				return m, nil
 			}
 			// Otherwise scroll diff
 		}
+
+		// BUGFIX: Prevent viewports from consuming keyboard events
+		// All keyboard handling is complete above - don't pass to viewports
+		return m, tea.Batch(cmds...)
 
 	case filesLoadedMsg:
 		m.files = msg.files
@@ -299,15 +393,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.err == nil && len(m.files) == 0 {
 			// No files found - provide helpful context-specific message
 			switch m.diffMode {
-			case git.DiffStaged:
-				m.err = fmt.Errorf("no staged changes found.\n\nTry one of the following:\n  • Run 'git add <file>' to stage some changes\n  • Use --unstaged to see unstaged changes\n  • Remove --staged flag to see all changes")
-			case git.DiffUnstaged:
-				m.err = fmt.Errorf("no unstaged changes found.\n\nTry one of the following:\n  • Use --staged to see staged changes\n  • Remove --unstaged flag to see all changes\n  • Make some changes to your working directory")
-			default:
-				msg := "no changes found in the repository.\n\nMake sure you have:\n  • Modified some files in your working directory\n  • Staged some changes with 'git add'\n  • Checked that you're in a git repository"
-				if !m.showUntracked {
-					msg += "\n  • Press 'u' to show untracked files"
+			case git.DiffBranch:
+				currentDisplay := m.currentBranch
+				if currentDisplay == "" {
+					currentDisplay = "(detached HEAD)"
 				}
+				m.err = fmt.Errorf("no differences found between '%s' and '%s'.\n\nThe branches may be identical, or you may be comparing a branch with itself.\n\n✓ KEYBOARD SHORTCUTS AVAILABLE:\n  • Press 'b' to select a different branch\n  • Press 'x' to exit branch comparison mode\n  • Press 't' to change theme", currentDisplay, m.compareBranch)
+			case git.DiffStaged:
+				m.err = fmt.Errorf("no staged changes found.\n\n✓ KEYBOARD SHORTCUTS AVAILABLE:\n  • Press 'b' to compare branches\n  • Press 't' to change theme\n\nOr:\n  • Run 'git add <file>' to stage changes\n  • Restart with --unstaged flag")
+			case git.DiffUnstaged:
+				m.err = fmt.Errorf("no unstaged changes found.\n\n✓ KEYBOARD SHORTCUTS AVAILABLE:\n  • Press 'b' to compare branches\n  • Press 't' to change theme\n\nOr:\n  • Make changes to your working directory\n  • Restart with --staged flag to see staged changes")
+			default:
+				msg := "no changes found in the repository.\n\n"
+				msg += "✓ KEYBOARD SHORTCUTS AVAILABLE:\n"
+				msg += "  • Press 'b' to compare with another branch\n"
+				if !m.showUntracked {
+					msg += "  • Press 'u' to show untracked files\n"
+				}
+				msg += "  • Press 't' to change theme\n"
+				msg += "\nOr make changes:\n"
+				msg += "  • Modify files in your working directory\n"
+				msg += "  • Stage changes with 'git add'\n"
+				msg += "  • Check that you're in a git repository"
 				m.err = fmt.Errorf("%s", msg)
 			}
 		}
@@ -318,11 +425,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.fileListView.SetContent(ui.RenderFileList(m.files, m.selectedFile))
 			}
 
-			// Select initial file (either specified via --file flag or default to first)
-			// Only reset selection if we just loaded files and we weren't trying to preserve it?
 			// Logic here is simple: if m.initialFile is set, select it.
-			// But if we just toggled 'u', we might want to keep selection?
-			// For simplicity, let's just reset or try to keep index if valid.
 			if m.selectedFile >= len(m.files) {
 				m.selectedFile = 0
 			}
@@ -337,7 +440,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode)
+			return m, loadFileDiffCmd(m.files[m.selectedFile].Path, m.fullContext, m.diffMode, m.compareBranch)
 		}
 		return m, nil
 
@@ -364,22 +467,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case branchesLoadedMsg:
+		if msg.err != nil {
+			m.err = fmt.Errorf("failed to load branches: %w", msg.err)
+			m.branchSelectorMode = false
+		} else {
+			m.branchList = msg.branches
+			m.currentBranch = msg.currentBranch
+			m.filterBranches() // Reapply any existing filter from branchInput
+		}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.winWidth = msg.Width
 		m.winHeight = msg.Height
 
-		// Calculate dimensions: 20-40-40 split
-		// Increased margin to account for header, footer, borders, and potential text wrapping
-		headerHeight := 3 // Title + margin + buffer
-		footerHeight := 3 // Footer can wrap to 2-3 lines in narrow terminals
-		borderHeight := 2 // Top and bottom borders for viewports
+		headerHeight := 4 // 3 lines for title + 1 line margin (TitleStyle.MarginBottom)
+		footerHeight := 3
+		borderHeight := 2
 		verticalMarginHeight := headerHeight + footerHeight + borderHeight
 
-		// 20% for sidebar, 40% for each diff pane
 		sidebarWidth := msg.Width * 20 / 100
 		diffPaneWidth := msg.Width * 40 / 100
 
-		// Account for borders (subtract a bit for padding)
 		if sidebarWidth > 4 {
 			sidebarWidth -= 4
 		}
@@ -390,12 +500,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.ready {
 			m.ready = true
 
-			// Initialize three viewports
 			m.fileListView = viewport.New(sidebarWidth, msg.Height-verticalMarginHeight)
 			m.leftView = viewport.New(diffPaneWidth, msg.Height-verticalMarginHeight)
 			m.rightView = viewport.New(diffPaneWidth, msg.Height-verticalMarginHeight)
 		} else {
-			// Handle resize
 			m.fileListView.Width = sidebarWidth
 			m.fileListView.Height = msg.Height - verticalMarginHeight
 			m.leftView.Width = diffPaneWidth
@@ -404,18 +512,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.rightView.Height = msg.Height - verticalMarginHeight
 		}
 
-		// Update file list content
 		if len(m.files) > 0 {
 			m.fileListView.SetContent(ui.RenderFileList(m.files, m.selectedFile))
 		}
 	}
 
-	// Update viewports based on focus
 	if m.focus == focusFileList {
 		m.fileListView, cmd = m.fileListView.Update(msg)
 		cmds = append(cmds, cmd)
 	} else {
-		// Sync scrolling for diff panes
 		m.leftView, cmd = m.leftView.Update(msg)
 		cmds = append(cmds, cmd)
 
@@ -423,7 +528,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rightView.YOffset = m.leftView.YOffset
 	}
 
-	// Decrement theme change message counter
 	if m.themeChangeTicks > 0 {
 		m.themeChangeTicks--
 		if m.themeChangeTicks == 0 {
@@ -435,7 +539,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	// Show intro animation if in intro phase
 	if m.introPhase == 0 {
 		return intro.RenderAnimation(
 			intro.AnimationType(m.animationType),
@@ -450,6 +553,18 @@ func (m model) View() string {
 	}
 
 	header := ui.TitleStyle.Render(appTitle)
+
+	// Add branch comparison indicator if active
+	if m.diffMode == git.DiffBranch && m.compareBranch != "" {
+		currentDisplay := m.currentBranch
+		if currentDisplay == "" {
+			currentDisplay = "(detached HEAD)"
+		}
+		branchInfo := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#89CFF0")).
+			Render(fmt.Sprintf(" [%s vs %s]", currentDisplay, m.compareBranch))
+		header = lipgloss.JoinHorizontal(lipgloss.Center, header, branchInfo)
+	}
 
 	// Add theme change notification if active
 	if m.themeChangeMsg != "" {
@@ -470,7 +585,8 @@ func (m model) View() string {
 		searchInfo = "No matches found"
 	}
 
-	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext, focusOnFileList, m.searchMode, m.showUntracked, searchInfo, m.winWidth)
+	branchCompareMode := m.diffMode == git.DiffBranch
+	footer := ui.RenderFooter(m.showLineNumbers, m.fullContext, focusOnFileList, m.searchMode, m.showUntracked, searchInfo, branchCompareMode, m.winWidth)
 
 	// Show search input if in search mode
 	var searchBar string
@@ -478,42 +594,128 @@ func (m model) View() string {
 		searchBar = ui.SearchInputStyle.Render(m.searchInput.View())
 	}
 
+	// Build base view - either error box or normal content
+	var baseView string
 	if m.err != nil {
 		errorBox := ui.ErrorBox(m.err, m.winWidth)
 		if searchBar != "" {
-			return lipgloss.JoinVertical(lipgloss.Top, header, errorBox, searchBar, footer)
+			baseView = lipgloss.JoinVertical(lipgloss.Top, header, errorBox, searchBar, footer)
+		} else {
+			baseView = lipgloss.JoinVertical(lipgloss.Top, header, errorBox, footer)
 		}
-		return lipgloss.JoinVertical(lipgloss.Top, header, errorBox, footer)
-	}
-
-	// Render file list sidebar with focus-aware styling
-	fileListContent := m.fileListView.View()
-	var sidebarBox string
-	if focusOnFileList {
-		sidebarBox = ui.FileListStyleFocused.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
 	} else {
-		sidebarBox = ui.FileListStyle.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
+
+		// Render file list sidebar with focus-aware styling
+		fileListContent := m.fileListView.View()
+		var sidebarBox string
+		if focusOnFileList {
+			sidebarBox = ui.FileListStyleFocused.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
+		} else {
+			sidebarBox = ui.FileListStyle.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
+		}
+
+		// Render diff panes with focus-aware styling
+		var leftBox, rightBox string
+		if focusOnFileList {
+			// Diff panes are unfocused
+			leftBox = ui.BorderStyleUnfocused.Width(m.leftView.Width).Render(m.leftView.View())
+			rightBox = ui.BorderStyleUnfocused.Width(m.rightView.Width).Render(m.rightView.View())
+		} else {
+			// Diff panes are focused
+			leftBox = ui.BorderStyleFocused.Width(m.leftView.Width).Render(m.leftView.View())
+			rightBox = ui.BorderStyleFocused.Width(m.rightView.Width).Render(m.rightView.View())
+		}
+
+		// Join horizontally: sidebar | left diff | right diff
+		body := lipgloss.JoinHorizontal(lipgloss.Top, sidebarBox, leftBox, rightBox)
+
+		// Build base view from normal content
+		if searchBar != "" {
+			baseView = lipgloss.JoinVertical(lipgloss.Top, header, body, searchBar, footer)
+		} else {
+			baseView = lipgloss.JoinVertical(lipgloss.Top, header, body, footer)
+		}
+	} // Close the else block from line 607
+
+	// Overlay branch selector if active
+	if m.branchSelectorMode {
+		branchSelector := renderBranchSelector(m)
+		// Center the branch selector overlay
+		branchOverlay := lipgloss.Place(
+			m.winWidth,
+			m.winHeight,
+			lipgloss.Center,
+			lipgloss.Center,
+			branchSelector,
+			lipgloss.WithWhitespaceChars(""),
+		)
+		return branchOverlay
 	}
 
-	// Render diff panes with focus-aware styling
-	var leftBox, rightBox string
-	if focusOnFileList {
-		// Diff panes are unfocused
-		leftBox = ui.BorderStyleUnfocused.Width(m.leftView.Width).Render(m.leftView.View())
-		rightBox = ui.BorderStyleUnfocused.Width(m.rightView.Width).Render(m.rightView.View())
+	return baseView
+}
+
+// renderBranchSelector renders the branch selection modal
+func renderBranchSelector(m model) string {
+	var sb strings.Builder
+
+	// Title
+	sb.WriteString(ui.BranchSelectorTitleStyle.Render("Select Branch to Compare"))
+	sb.WriteString("\n\n")
+
+	// Input field
+	sb.WriteString(ui.BranchSelectorInputStyle.Render(m.branchInput.View()))
+	sb.WriteString("\n\n")
+
+	// Current branch display
+	if m.currentBranch != "" {
+		sb.WriteString(ui.CurrentBranchStyle.Render(fmt.Sprintf("Current: %s", m.currentBranch)))
 	} else {
-		// Diff panes are focused
-		leftBox = ui.BorderStyleFocused.Width(m.leftView.Width).Render(m.leftView.View())
-		rightBox = ui.BorderStyleFocused.Width(m.rightView.Width).Render(m.rightView.View())
+		sb.WriteString(ui.CurrentBranchStyle.Render("Current: (detached HEAD)"))
+	}
+	sb.WriteString("\n\n")
+
+	// Branch list (show max 10)
+	maxDisplay := 10
+	if len(m.filteredBranches) == 0 {
+		sb.WriteString(ui.BranchListItemStyle.Render("No branches found"))
+	} else {
+		start := 0
+		if m.selectedBranchIdx > maxDisplay/2 && len(m.filteredBranches) > maxDisplay {
+			start = m.selectedBranchIdx - maxDisplay/2
+		}
+
+		end := start + maxDisplay
+		if end > len(m.filteredBranches) {
+			end = len(m.filteredBranches)
+		}
+
+		for i := start; i < end; i++ {
+			branch := m.filteredBranches[i]
+			if i == m.selectedBranchIdx {
+				sb.WriteString(ui.SelectedBranchStyle.Render("> " + branch))
+			} else {
+				sb.WriteString(ui.BranchListItemStyle.Render("  " + branch))
+			}
+			sb.WriteString("\n")
+		}
+
+		// Show count if filtered
+		if len(m.filteredBranches) < len(m.branchList) {
+			sb.WriteString("\n")
+			sb.WriteString(ui.BranchCountStyle.Render(
+				fmt.Sprintf("Showing %d of %d branches", len(m.filteredBranches), len(m.branchList)),
+			))
+		}
 	}
 
-	// Join horizontally: sidebar | left diff | right diff
-	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebarBox, leftBox, rightBox)
+	// Footer hint
+	sb.WriteString("\n\n")
+	sb.WriteString(ui.BranchSelectorFooterStyle.Render(
+		"Enter: select • j/k or ↓/↑: navigate • Type to filter • Esc: cancel",
+	))
 
-	if searchBar != "" {
-		return lipgloss.JoinVertical(lipgloss.Top, header, body, searchBar, footer)
-	}
-	return lipgloss.JoinVertical(lipgloss.Top, header, body, footer)
+	return ui.BranchSelectorBoxStyle.Render(sb.String())
 }
 
 // convertSearchMatches converts search.Match to ui.SearchMatch format
@@ -531,21 +733,21 @@ func convertSearchMatches(matches []search.Match, currentMatchIdx int) []ui.Sear
 	return result
 }
 
-func loadFilesCmd(mode git.DiffMode, _ string, includeUntracked bool) tea.Cmd {
+func loadFilesCmd(mode git.DiffMode, compareBranch string, _ string, includeUntracked bool) tea.Cmd {
 	return func() tea.Msg {
-		files, err := git.GetModifiedFiles(mode, includeUntracked)
+		files, err := git.GetModifiedFiles(mode, compareBranch, includeUntracked)
 		return filesLoadedMsg{files: files, err: err}
 	}
 }
 
-func loadFileDiffCmd(filepath string, fullContext bool, mode git.DiffMode) tea.Cmd {
+func loadFileDiffCmd(filepath string, fullContext bool, mode git.DiffMode, compareBranch string) tea.Cmd {
 	return func() tea.Msg {
 		contextLines := 0 // default
 		if fullContext {
 			contextLines = -1 // full context
 		}
 
-		diffOutput, err := git.GetFileDiff(filepath, contextLines, mode)
+		diffOutput, err := git.GetFileDiff(filepath, contextLines, mode, compareBranch)
 		if err != nil {
 			return fileDiffLoadedMsg{err: err}
 		}
@@ -556,6 +758,22 @@ func loadFileDiffCmd(filepath string, fullContext bool, mode git.DiffMode) tea.C
 		}
 
 		return fileDiffLoadedMsg{rows: rows}
+	}
+}
+
+func loadBranchesCmd() tea.Cmd {
+	return func() tea.Msg {
+		branches, err := git.GetBranches()
+		if err != nil {
+			return branchesLoadedMsg{err: err}
+		}
+
+		current, _ := git.GetCurrentBranch()
+
+		return branchesLoadedMsg{
+			branches:      branches,
+			currentBranch: current,
+		}
 	}
 }
 
@@ -574,6 +792,8 @@ func printHelp() {
 	fmt.Println("  --file=<filename>             Open with specific file selected")
 	fmt.Println("  --staged                      Show only staged changes (git diff --cached)")
 	fmt.Println("  --unstaged                    Show only unstaged changes")
+	fmt.Println("  --compare=<branch>            Compare current branch to specified branch")
+	fmt.Println("  --branch=<branch>             Alias for --compare")
 	fmt.Println("  --theme=<name>                Color theme (default: dark)")
 	fmt.Println("  --list-themes                 List all available themes")
 	fmt.Println("  --show-theme-colors <name>    Preview colors for a specific theme")
@@ -588,6 +808,9 @@ func printHelp() {
 	fmt.Println("  diffbubble --staged                      # Show only staged changes")
 	fmt.Println("  diffbubble --unstaged                    # Show only unstaged changes")
 	fmt.Println("  diffbubble --file=README.md              # Open with README.md selected")
+	fmt.Println("  diffbubble --compare=main                # Compare current branch to main")
+	fmt.Println("  diffbubble --compare=origin/develop      # Compare to remote branch")
+	fmt.Println("  diffbubble --branch=feature/xyz          # Using --branch alias")
 	fmt.Println("  diffbubble --theme=catppuccin            # Use Catppuccin theme")
 	fmt.Println("  diffbubble --theme=tokyo-night --staged  # Tokyo Night theme, staged only")
 	fmt.Println("  diffbubble --list-themes                 # List all available themes")
@@ -595,9 +818,12 @@ func printHelp() {
 	fmt.Println("\nKeyboard Controls:")
 	fmt.Println("  tab          Switch focus between file list and diff panes")
 	fmt.Println("  j/k, ↓/↑     Navigate files (when file list focused) or scroll diff")
-	fmt.Println("  n            Toggle line numbers on/off")
+	fmt.Println("  n            Toggle line numbers on/off (or next match when search active)")
 	fmt.Println("  c            Toggle between focus mode and full context")
 	fmt.Println("  t            Cycle through themes interactively")
+	fmt.Println("  b            Open branch selector for comparison")
+	fmt.Println("  x            Exit branch comparison mode")
+	fmt.Println("  /            Enter search mode")
 	fmt.Println("  q, esc       Quit the application")
 	fmt.Println("\nRequires:")
 	fmt.Println("  - A git repository with changes to display")
@@ -717,6 +943,33 @@ func (m *model) performSearch() {
 	}
 }
 
+func (m *model) filterBranches() {
+	query := strings.ToLower(m.branchInput.Value())
+	if query == "" {
+		m.filteredBranches = m.branchList
+		m.selectedBranchIdx = 0
+		return
+	}
+
+	filtered := []string{}
+	for _, branch := range m.branchList {
+		if strings.Contains(strings.ToLower(branch), query) {
+			filtered = append(filtered, branch)
+		}
+	}
+
+	m.filteredBranches = filtered
+
+	// Adjust selected index if out of bounds
+	if m.selectedBranchIdx >= len(filtered) {
+		if len(filtered) > 0 {
+			m.selectedBranchIdx = len(filtered) - 1
+		} else {
+			m.selectedBranchIdx = 0
+		}
+	}
+}
+
 func updateSearchStyles(ti *textinput.Model) {
 	theme := ui.GetTheme()
 	ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Foreground))
@@ -744,6 +997,7 @@ func main() {
 		themeName       string
 		listThemes      bool
 		showThemeColors string
+		compareBranch   string
 	)
 
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
@@ -756,6 +1010,8 @@ func main() {
 	flag.StringVar(&themeName, "theme", cfg.Theme, "Color theme")
 	flag.BoolVar(&listThemes, "list-themes", false, "List all available themes")
 	flag.StringVar(&showThemeColors, "show-theme-colors", "", "Show color preview for a theme")
+	flag.StringVar(&compareBranch, "compare", cfg.CompareBranch, "Compare current branch to specified branch")
+	flag.StringVar(&compareBranch, "branch", cfg.CompareBranch, "Alias for --compare")
 	flag.Parse()
 
 	if showVersion {
@@ -785,11 +1041,38 @@ func main() {
 	}
 	ui.SetTheme(themeName)
 
+	// Validate branch if specified
+	if compareBranch != "" {
+		if err := git.ValidateBranch(compareBranch); err != nil {
+			fmt.Printf("Error: Branch '%s' not found\n\n", compareBranch)
+
+			// Try to show available branches
+			if branches, brErr := git.GetBranches(); brErr == nil {
+				fmt.Println("Available branches:")
+				for _, branch := range branches {
+					fmt.Printf("  • %s\n", branch)
+				}
+			} else {
+				fmt.Println("Could not list available branches.")
+				fmt.Println("Make sure you're in a git repository.")
+			}
+
+			os.Exit(1)
+		}
+	}
+
 	// Determine diff mode based on flags (CLI flags override config)
 	diffMode := git.DiffAll
 	if showStaged && showUnstaged {
 		fmt.Println("Error: Cannot use both --staged and --unstaged flags together")
 		os.Exit(1)
+	} else if compareBranch != "" {
+		// Branch comparison takes precedence
+		if showStaged || showUnstaged {
+			fmt.Println("Error: Cannot use --compare with --staged or --unstaged")
+			os.Exit(1)
+		}
+		diffMode = git.DiffBranch
 	} else if showStaged {
 		diffMode = git.DiffStaged
 	} else if showUnstaged {
@@ -826,6 +1109,16 @@ func main() {
 	ti.Width = 50
 	updateSearchStyles(&ti)
 
+	// Initialize branch input
+	branchInput := textinput.New()
+	branchInput.Placeholder = "Type to filter branches..."
+	branchInput.CharLimit = 100
+	branchInput.Width = 50
+	updateSearchStyles(&branchInput)
+
+	// Get current branch for display
+	currentBranch, _ := git.GetCurrentBranch()
+
 	// Select random animation type (0=Glitch, 1=Scan)
 	animType := rand.Intn(2)
 
@@ -844,6 +1137,10 @@ func main() {
 			animationType:      animType,
 			animationFrame:     0,
 			animationMaxFrames: intro.GetMaxFrames(intro.AnimationType(animType)),
+			compareBranch:      compareBranch,
+			branchInput:        branchInput,
+			currentBranch:      currentBranch,
+			selectedBranchIdx:  0,
 		},
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),

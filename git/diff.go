@@ -16,6 +16,7 @@ const (
 	DiffAll      DiffMode = iota // Both staged and unstaged (default)
 	DiffStaged                   // Only staged changes (--cached)
 	DiffUnstaged                 // Only unstaged changes
+	DiffBranch                   // Compare current branch to target branch
 )
 
 // FileStatus represents the status of a modified file.
@@ -50,10 +51,16 @@ func Diff() ([]byte, error) {
 }
 
 // GetModifiedFiles returns a list of all files with changes and their stats.
-func GetModifiedFiles(mode DiffMode, includeUntracked bool) ([]FileStat, error) {
+func GetModifiedFiles(mode DiffMode, compareBranch string, includeUntracked bool) ([]FileStat, error) {
 	// Build git diff arguments based on mode
 	var diffArgs []string
 	switch mode {
+	case DiffBranch:
+		if compareBranch == "" {
+			return nil, fmt.Errorf("compare branch not specified")
+		}
+		// Three-dot diff: changes in HEAD since diverging from compareBranch
+		diffArgs = []string{"diff", fmt.Sprintf("%s...HEAD", compareBranch)}
 	case DiffStaged:
 		diffArgs = []string{"diff", "--cached"}
 	case DiffUnstaged:
@@ -179,10 +186,53 @@ func GetModifiedFiles(mode DiffMode, includeUntracked bool) ([]FileStat, error) 
 	return files, nil
 }
 
+// GetBranches returns a list of all available branches (local and remote).
+func GetBranches() ([]string, error) {
+	cmd := exec.Command("git", "branch", "-a", "--format=%(refname:short)")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("running git branch: %w", err)
+	}
+
+	var branches []string
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+	for scanner.Scan() {
+		branch := strings.TrimSpace(scanner.Text())
+		if branch != "" {
+			branches = append(branches, branch)
+		}
+	}
+
+	return branches, nil
+}
+
+// GetCurrentBranch returns the name of the current branch.
+// Returns empty string if in detached HEAD state.
+func GetCurrentBranch() (string, error) {
+	cmd := exec.Command("git", "branch", "--show-current")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("running git branch --show-current: %w", err)
+	}
+
+	branch := strings.TrimSpace(string(out))
+	return branch, nil
+}
+
+// ValidateBranch checks if a branch exists.
+func ValidateBranch(branch string) error {
+	cmd := exec.Command("git", "rev-parse", "--verify", branch)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("branch '%s' not found", branch)
+	}
+	return nil
+}
+
 // GetFileDiff returns the unified diff for a specific file.
 // contextLines specifies how many context lines to show (0 for default, -1 for full file)
 // mode specifies which changes to show (staged, unstaged, or all)
-func GetFileDiff(filepath string, contextLines int, mode DiffMode) ([]byte, error) {
+// compareBranch specifies the target branch for comparison (only used when mode is DiffBranch)
+func GetFileDiff(filepath string, contextLines int, mode DiffMode, compareBranch string) ([]byte, error) {
 	// Check if file is untracked
 	isUntracked := false
 	checkCmd := exec.Command("git", "ls-files", "--error-unmatch", filepath)
@@ -205,6 +255,12 @@ func GetFileDiff(filepath string, contextLines int, mode DiffMode) ([]byte, erro
 	} else {
 		// Normal diff
 		switch mode {
+		case DiffBranch:
+			if compareBranch == "" {
+				return nil, fmt.Errorf("compare branch not specified")
+			}
+			// Three-dot diff: changes in HEAD since diverging from compareBranch
+			args = []string{"diff", fmt.Sprintf("%s...HEAD", compareBranch)}
 		case DiffStaged:
 			args = []string{"diff", "--cached"}
 		case DiffUnstaged:

@@ -36,6 +36,16 @@ var (
 	SearchMatchStyle        lipgloss.Style
 	SearchCurrentMatchStyle lipgloss.Style
 	SearchInputStyle        lipgloss.Style
+
+	// Branch selector styles
+	BranchSelectorBoxStyle    lipgloss.Style
+	BranchSelectorTitleStyle  lipgloss.Style
+	BranchSelectorInputStyle  lipgloss.Style
+	BranchSelectorFooterStyle lipgloss.Style
+	CurrentBranchStyle        lipgloss.Style
+	SelectedBranchStyle       lipgloss.Style
+	BranchListItemStyle       lipgloss.Style
+	BranchCountStyle          lipgloss.Style
 )
 
 // updateStyles applies the current theme to all styles
@@ -149,4 +159,44 @@ func updateStyles() {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(theme.FocusedBorderColor)).
 		Padding(0, 1)
+
+	// Branch selector styles
+	BranchSelectorBoxStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(theme.FocusedBorderColor)).
+		Padding(1, 2).
+		Width(60).
+		Background(lipgloss.Color(theme.Background))
+
+	BranchSelectorTitleStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(theme.TitleFg)).
+		Bold(true).
+		Align(lipgloss.Center)
+
+	BranchSelectorInputStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(theme.FocusedBorderColor)).
+		Padding(0, 1).
+		Foreground(lipgloss.Color(theme.Foreground))
+
+	BranchSelectorFooterStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(theme.ContextFg)).
+		Italic(true).
+		Align(lipgloss.Center)
+
+	CurrentBranchStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(theme.AddedFg)).
+		Bold(true)
+
+	SelectedBranchStyle = lipgloss.NewStyle().
+		Background(lipgloss.Color(theme.FocusedBorderColor)).
+		Foreground(lipgloss.Color(theme.TitleFg)).
+		Bold(true)
+
+	BranchListItemStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(theme.Foreground))
+
+	BranchCountStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(theme.ContextFg)).
+		Italic(true)
 }
