@@ -165,7 +165,7 @@ func updateStyles() {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(theme.FocusedBorderColor)).
 		Padding(1, 2).
-		Width(60).
+		Width(80).
 		Background(lipgloss.Color(theme.Background))
 
 	BranchSelectorTitleStyle = lipgloss.NewStyle().
