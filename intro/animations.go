@@ -16,6 +16,8 @@ func RenderAnimation(animType AnimationType, frame, width, height int) string {
 		return renderGlitch(frame, width, height)
 	case Scan:
 		return renderScan(frame, width, height)
+	case Lightning:
+		return renderLightning(frame, width, height)
 	default:
 		return renderGlitch(frame, width, height)
 	}
@@ -372,5 +374,168 @@ func renderScan(frame, width, height int) string {
 	content := fmt.Sprintf("%s\n\n%s\n%s", catArt, statusText, progressBar)
 
 	// Center the content
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
+}
+
+// renderLightning renders the "Cat Working at Computer" animation
+func renderLightning(frame, width, height int) string {
+	theme := ui.GetTheme()
+
+	// Determine animation phase
+	if frame <= 15 {
+		return renderWorkingPhase(frame, width, height, theme)
+	} else if frame <= 30 {
+		return renderLoadingPhase(frame, width, height, theme)
+	} else if frame <= 33 {
+		return renderCompletePhase(frame, width, height, theme)
+	} else if frame <= 42 {
+		return renderGlitchTransition(frame, width, height, theme)
+	} else {
+		return renderSuccessPhase(frame, width, height, theme)
+	}
+}
+
+// renderComputer returns simple ASCII art of a computer screen
+func renderComputer() string {
+	computer := []string{
+		" ┌───────────┐",
+		" │           │",
+		" │     █     │",
+		" │           │",
+		" └───────────┘",
+	}
+	return strings.Join(computer, "\n")
+}
+
+// renderWorkingPhase shows red cat with computer and empty loading bar (frames 0-15)
+func renderWorkingPhase(frame, width, height int, theme ui.Theme) string {
+	// Cat in red
+	redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.DeletionFg))
+	catLines := []string{}
+	for _, line := range PixelCat {
+		catLines = append(catLines, redStyle.Render(line))
+	}
+
+	computer := renderComputer()
+	statusText := "PROCESSING DIFFS..."
+	loadingBar := "[░░░░░░░░░░░░░░]  0%"
+
+	content := strings.Join(catLines, "\n") + "\n\n" + computer + "\n\n" + statusText + "\n" + loadingBar
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
+}
+
+// renderLoadingPhase shows red cat with loading bar filling up (frames 16-30)
+func renderLoadingPhase(frame, width, height int, theme ui.Theme) string {
+	// Cat in red
+	redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.DeletionFg))
+	catLines := []string{}
+	for _, line := range PixelCat {
+		catLines = append(catLines, redStyle.Render(line))
+	}
+
+	computer := renderComputer()
+
+	// Calculate progress (0% at frame 16, 100% at frame 30)
+	progress := ((frame - 16) * 100) / 14
+	if progress > 100 {
+		progress = 100
+	}
+
+	// Build loading bar
+	barWidth := 14
+	filled := (progress * barWidth) / 100
+	empty := barWidth - filled
+
+	loadingBar := fmt.Sprintf("[%s%s] %3d%%",
+		strings.Repeat("█", filled),
+		strings.Repeat("░", empty),
+		progress)
+
+	statusText := "PROCESSING DIFFS..."
+
+	content := strings.Join(catLines, "\n") + "\n\n" + computer + "\n\n" + statusText + "\n" + loadingBar
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
+}
+
+// renderCompletePhase shows red cat with 100% loading bar (frames 31-33)
+func renderCompletePhase(frame, width, height int, theme ui.Theme) string {
+	// Cat in red
+	redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.DeletionFg))
+	catLines := []string{}
+	for _, line := range PixelCat {
+		catLines = append(catLines, redStyle.Render(line))
+	}
+
+	computer := renderComputer()
+	loadingBar := "[██████████████] 100%"
+	statusText := "✓ COMPLETE!"
+
+	content := strings.Join(catLines, "\n") + "\n\n" + computer + "\n\n" + statusText + "\n" + loadingBar
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
+}
+
+// renderGlitchTransition applies glitch effects and transitions from red to green (frames 34-42)
+func renderGlitchTransition(frame, width, height int, theme ui.Theme) string {
+	glitchFrame := frame - 34 // 0-8
+
+	// Determine base color (red → green transition)
+	var baseStyle lipgloss.Style
+	if glitchFrame < 5 {
+		// Frames 34-38: Red with glitch
+		baseStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(theme.DeletionFg))
+	} else {
+		// Frames 39-42: Green with glitch
+		baseStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(theme.AdditionFg))
+	}
+
+	// Apply glitch effects
+	catLines := PixelCat
+
+	// Digital corruption
+	catLines = applyDigitalCorruption(catLines, frame)
+
+	// Render cat with glitch colors
+	styledCat := []string{}
+	for _, line := range catLines {
+		styledCat = append(styledCat, baseStyle.Render(line))
+	}
+
+	// Apply flicker effect
+	catContent := strings.Join(styledCat, "\n")
+	if frame%2 == 0 {
+		// Flicker: alternate rendering
+		catContent = renderWithFlicker(catLines, frame)
+	}
+
+	computer := renderComputer()
+	statusText := "OPTIMIZING..."
+
+	content := catContent + "\n\n" + computer + "\n\n" + statusText
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
+}
+
+// renderSuccessPhase shows green cat with glow effect (frames 43-50)
+func renderSuccessPhase(frame, width, height int, theme ui.Theme) string {
+	// Cat in green
+	var catContent string
+	if frame >= 45 {
+		// Apply glow effect for final frames
+		catContent = renderCatWithGlow(PixelCat)
+		// Apply green color
+		greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.AdditionFg)).Bold(true)
+		catContent = greenStyle.Render(catContent)
+	} else {
+		greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.AdditionFg)).Bold(true)
+		catLines := []string{}
+		for _, line := range PixelCat {
+			catLines = append(catLines, greenStyle.Render(line))
+		}
+		catContent = strings.Join(catLines, "\n")
+	}
+
+	computer := renderComputer()
+	statusText := "✓ READY"
+
+	content := catContent + "\n\n" + computer + "\n\n" + statusText
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
 }
