@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -1118,9 +1119,8 @@ func main() {
 	// Get current branch for display
 	currentBranch, _ := git.GetCurrentBranch()
 
-	// Select random animation type (0=Glitch, 1=Scan, 2=Lightning)
-	// TEMPORARY: Force Lightning for testing
-	animType := 2 // rand.Intn(3)
+	// Select random animation type (0=Glitch, 1=Scan, 2=Cat Working)
+	animType := rand.Intn(3)
 
 	p := tea.NewProgram(
 		model{
