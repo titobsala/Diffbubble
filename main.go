@@ -24,7 +24,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.5.2"
+	version  = "0.5.3"
 )
 
 type focusPane int
@@ -1119,8 +1119,8 @@ func main() {
 	// Get current branch for display
 	currentBranch, _ := git.GetCurrentBranch()
 
-	// Select random animation type (0=Glitch, 1=Scan)
-	animType := rand.Intn(2)
+	// Select random animation type (0=Glitch, 1=Scan, 2=Cat Working)
+	animType := rand.Intn(3)
 
 	p := tea.NewProgram(
 		model{
