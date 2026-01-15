@@ -46,7 +46,7 @@ func RenderStatsView(branchStats *stats.BranchStats, width, height int) string {
 	}
 
 	// Footer
-	footer := RenderStatsFooter(width)
+	footer := RenderStatsFooter(branchStats.CompareMode, width)
 	sections = append(sections, footer)
 
 	// Join all sections
@@ -272,12 +272,17 @@ func RenderCommitHistory(history stats.CommitHistory, width int) string {
 }
 
 // RenderStatsFooter renders footer with keyboard hints for stats view.
-func RenderStatsFooter(termWidth int) string {
+func RenderStatsFooter(compareMode string, termWidth int) string {
 	hints := []string{
+		"r: toggle remote",
 		"esc: back to diff",
 		"q: quit",
 		"t: theme",
 	}
+
+	// Add current mode indicator
+	modeIndicator := fmt.Sprintf("mode: %s", compareMode)
+	hints = append([]string{modeIndicator}, hints...)
 
 	footer := strings.Join(hints, " • ")
 	return FooterStyle.Render(footer)

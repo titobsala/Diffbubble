@@ -238,6 +238,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
+		case "r":
+			// Toggle remote comparison in stats mode
+			if m.statsMode {
+				m.compareRemote = !m.compareRemote
+				m.statsLoading = true
+				m.statsData = nil
+				return m, loadStatsCmd("", m.compareRemote)
+			}
+			return m, nil
+
 		case "esc":
 			// Exit stats mode if active
 			if m.statsMode {

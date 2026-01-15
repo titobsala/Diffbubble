@@ -13,13 +13,13 @@ import (
 
 // CommitInfo represents metadata about a single commit.
 type CommitInfo struct {
-	Hash       string    // Short hash (7 chars)
-	Message    string    // First line of commit message
-	Author     string    // Author name
-	Date       time.Time // Commit date
-	DateStr    string    // Relative date string (e.g., "2 hours ago")
-	Additions  int       // Total lines added in commit
-	Deletions  int       // Total lines deleted in commit
+	Hash      string    // Short hash (7 chars)
+	Message   string    // First line of commit message
+	Author    string    // Author name
+	Date      time.Time // Commit date
+	DateStr   string    // Relative date string (e.g., "2 hours ago")
+	Additions int       // Total lines added in commit
+	Deletions int       // Total lines deleted in commit
 }
 
 // GetBranchCommits retrieves commits in current branch that are not in baseBranch.
