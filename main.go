@@ -14,6 +14,7 @@ import (
 	"github.com/titobsala/diffbubble/intro"
 	"github.com/titobsala/diffbubble/parser"
 	"github.com/titobsala/diffbubble/search"
+	"github.com/titobsala/diffbubble/stats"
 	"github.com/titobsala/diffbubble/ui"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -24,7 +25,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.5.3"
+	version  = "0.6.0"
 )
 
 type focusPane int
@@ -83,6 +84,12 @@ type model struct {
 	animationType      int
 	animationFrame     int
 	animationMaxFrames int
+
+	// Stats mode state
+	statsMode     bool               // Whether stats view is active
+	statsData     *stats.BranchStats // Cached stats data
+	statsLoading  bool               // Whether stats are being loaded
+	compareRemote bool               // Whether to compare with remote tracking branch
 }
 
 // Message types for async operations
@@ -100,6 +107,11 @@ type branchesLoadedMsg struct {
 	branches      []string
 	currentBranch string
 	err           error
+}
+
+type statsLoadedMsg struct {
+	stats *stats.BranchStats
+	err   error
 }
 
 // tickMsg is sent periodically for intro animation frames
@@ -227,6 +239,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "esc":
+			// Exit stats mode if active
+			if m.statsMode {
+				m.statsMode = false
+				m.statsData = nil
+				return m, nil
+			}
+
 			// Exit search mode (already handled above but just in case)
 			if m.searchMode {
 				m.searchMode = false
@@ -326,6 +345,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showUntracked = !m.showUntracked
 			// Reload files
 			return m, loadFilesCmd(m.diffMode, m.compareBranch, "", m.showUntracked)
+
+		case "s":
+			// Toggle stats mode
+			if !m.statsMode {
+				// Enter stats mode - load stats
+				m.statsMode = true
+				m.statsLoading = true
+				return m, loadStatsCmd("", m.compareRemote)
+			} else {
+				// Exit stats mode
+				m.statsMode = false
+				m.statsData = nil
+				return m, nil
+			}
 
 		case "t":
 			// Cycle through themes
@@ -478,6 +511,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case statsLoadedMsg:
+		m.statsLoading = false
+		if msg.err != nil {
+			m.err = fmt.Errorf("failed to load statistics: %w", msg.err)
+			m.statsMode = false
+		} else {
+			m.statsData = msg.stats
+		}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.winWidth = msg.Width
 		m.winHeight = msg.Height
@@ -550,6 +593,16 @@ func (m model) View() string {
 
 	if !m.ready {
 		return "\n  Initializing..."
+	}
+
+	// Stats mode view
+	if m.statsMode {
+		if m.statsLoading {
+			return lipgloss.Place(m.winWidth, m.winHeight, lipgloss.Center, lipgloss.Center, "Loading statistics...")
+		}
+		if m.statsData != nil {
+			return ui.RenderStatsView(m.statsData, m.winWidth, m.winHeight)
+		}
 	}
 
 	header := ui.TitleStyle.Render(appTitle)
@@ -777,6 +830,13 @@ func loadBranchesCmd() tea.Cmd {
 	}
 }
 
+func loadStatsCmd(baseBranch string, compareRemote bool) tea.Cmd {
+	return func() tea.Msg {
+		branchStats, err := stats.ComputeBranchStats(baseBranch, compareRemote)
+		return statsLoadedMsg{stats: branchStats, err: err}
+	}
+}
+
 func printVersion() {
 	fmt.Printf("diffbubble version %s\n", version)
 }
@@ -792,6 +852,8 @@ func printHelp() {
 	fmt.Println("  --file=<filename>             Open with specific file selected")
 	fmt.Println("  --staged                      Show only staged changes (git diff --cached)")
 	fmt.Println("  --unstaged                    Show only unstaged changes")
+	fmt.Println("  --stats                       Show branch statistics vs main and exit (non-interactive)")
+	fmt.Println("  --remote                      Compare local branch vs remote tracking branch")
 	fmt.Println("  --compare=<branch>            Compare current branch to specified branch")
 	fmt.Println("  --branch=<branch>             Alias for --compare")
 	fmt.Println("  --theme=<name>                Color theme (default: dark)")
@@ -807,6 +869,8 @@ func printHelp() {
 	fmt.Println("  diffbubble                               # Show all changes")
 	fmt.Println("  diffbubble --staged                      # Show only staged changes")
 	fmt.Println("  diffbubble --unstaged                    # Show only unstaged changes")
+	fmt.Println("  diffbubble --stats                       # Show current branch vs main stats")
+	fmt.Println("  diffbubble --stats --remote              # Show local vs remote stats")
 	fmt.Println("  diffbubble --file=README.md              # Open with README.md selected")
 	fmt.Println("  diffbubble --compare=main                # Compare current branch to main")
 	fmt.Println("  diffbubble --compare=origin/develop      # Compare to remote branch")
@@ -820,6 +884,7 @@ func printHelp() {
 	fmt.Println("  j/k, ↓/↑     Navigate files (when file list focused) or scroll diff")
 	fmt.Println("  n            Toggle line numbers on/off (or next match when search active)")
 	fmt.Println("  c            Toggle between focus mode and full context")
+	fmt.Println("  s            Toggle branch statistics view (current branch vs main)")
 	fmt.Println("  t            Cycle through themes interactively")
 	fmt.Println("  b            Open branch selector for comparison")
 	fmt.Println("  x            Exit branch comparison mode")
@@ -901,6 +966,122 @@ func hexToRGB(hex string) (int, int, int) {
 	var r, g, b int
 	fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
 	return r, g, b
+}
+
+func printStats(baseBranch string, compareRemote bool) {
+	// Compute stats
+	branchStats, err := stats.ComputeBranchStats(baseBranch, compareRemote)
+	if err != nil {
+		fmt.Printf("Error: Failed to compute statistics: %v\n", err)
+		os.Exit(1)
+	}
+
+	printStatsToTerminal(branchStats)
+}
+
+func printStatsToTerminal(branchStats *stats.BranchStats) {
+	theme := ui.GetTheme()
+
+	// Helper to color text with ANSI codes
+	colorText := func(text, hexColor string) string {
+		r, g, b := hexToRGB(hexColor)
+		return fmt.Sprintf("\033[38;2;%d;%d;%dm%s\033[0m", r, g, b, text)
+	}
+
+	boldText := func(text string) string {
+		return fmt.Sprintf("\033[1m%s\033[0m", text)
+	}
+
+	fmt.Println()
+	fmt.Println(boldText("REPOSITORY STATISTICS"))
+	fmt.Println(strings.Repeat("═", 60))
+	fmt.Println()
+
+	// Title with branch comparison
+	titleText := fmt.Sprintf("%s %s", branchStats.CurrentBranch, branchStats.CompareMode)
+	fmt.Println(boldText(titleText))
+	fmt.Println(strings.Repeat("─", len(titleText)))
+	fmt.Println()
+
+	// Branch Changes Section
+	s := branchStats.BranchChanges
+	if s.TotalFiles == 0 {
+		fmt.Println("  No changes to display")
+	} else {
+		// Summary
+		summary := fmt.Sprintf("  Files Changed: %d   %s %s",
+			s.TotalFiles,
+			colorText(fmt.Sprintf("+%d", s.TotalAdditions), theme.AddedFg),
+			colorText(fmt.Sprintf("-%d", s.TotalDeletions), theme.DeletedFg),
+		)
+		fmt.Println(summary)
+		fmt.Println()
+
+		// File list
+		for _, file := range s.FileStats {
+			icon := statusIconPlain(file.Status, theme)
+			addStr := colorText(fmt.Sprintf("+%-4d", file.Additions), theme.AddedFg)
+			delStr := colorText(fmt.Sprintf("-%-4d", file.Deletions), theme.DeletedFg)
+			fmt.Printf("  %s %-40s  %s %s\n", icon, file.Path, addStr, delStr)
+		}
+	}
+
+	fmt.Println()
+
+	// Recent Commits Section
+	if branchStats.Commits.TotalCommits > 0 {
+		fmt.Println(strings.Repeat("═", 60))
+		fmt.Println()
+		fmt.Println(boldText(fmt.Sprintf("Branch Commits (%d):", branchStats.Commits.TotalCommits)))
+		fmt.Println(strings.Repeat("─", len(fmt.Sprintf("Branch Commits (%d):", branchStats.Commits.TotalCommits))))
+		fmt.Println()
+
+		for _, commit := range branchStats.Commits.Commits {
+			hash := colorText(commit.Hash, theme.ModifiedFg)
+			message := commit.Message
+			if len(message) > 50 {
+				message = message[:47] + "..."
+			}
+			author := commit.Author
+			if len(author) > 20 {
+				author = author[:17] + "..."
+			}
+
+			statsStr := ""
+			if commit.Additions > 0 || commit.Deletions > 0 {
+				statsStr = fmt.Sprintf("  %s %s",
+					colorText(fmt.Sprintf("+%d", commit.Additions), theme.AddedFg),
+					colorText(fmt.Sprintf("-%d", commit.Deletions), theme.DeletedFg),
+				)
+			}
+
+			fmt.Printf("  %s  %-50s  %-20s%s\n", hash, message, author, statsStr)
+		}
+	}
+
+	fmt.Println()
+}
+
+func statusIconPlain(status git.FileStatus, theme ui.Theme) string {
+	colorText := func(text, hexColor string) string {
+		r, g, b := hexToRGB(hexColor)
+		return fmt.Sprintf("\033[38;2;%d;%d;%dm%s\033[0m", r, g, b, text)
+	}
+
+	switch status {
+	case git.StatusModified:
+		return colorText("M", theme.ModifiedFg)
+	case git.StatusAdded:
+		return colorText("A", theme.AddedFg)
+	case git.StatusDeleted:
+		return colorText("D", theme.DeletedFg)
+	case git.StatusRenamed:
+		return colorText("R", theme.ModifiedFg)
+	case git.StatusUntracked:
+		return colorText("?", theme.AddedFg)
+	default:
+		return colorText("?", theme.AddedFg)
+	}
 }
 
 func (m *model) performSearch() {
@@ -994,6 +1175,8 @@ func main() {
 		selectedFile    string
 		showStaged      bool
 		showUnstaged    bool
+		showStats       bool
+		compareRemote   bool
 		themeName       string
 		listThemes      bool
 		showThemeColors string
@@ -1007,6 +1190,8 @@ func main() {
 	flag.StringVar(&selectedFile, "file", "", "Open with specific file selected")
 	flag.BoolVar(&showStaged, "staged", false, "Show only staged changes")
 	flag.BoolVar(&showUnstaged, "unstaged", false, "Show only unstaged changes")
+	flag.BoolVar(&showStats, "stats", false, "Show repository statistics and exit")
+	flag.BoolVar(&compareRemote, "remote", false, "Compare local branch vs remote tracking branch")
 	flag.StringVar(&themeName, "theme", cfg.Theme, "Color theme")
 	flag.BoolVar(&listThemes, "list-themes", false, "List all available themes")
 	flag.StringVar(&showThemeColors, "show-theme-colors", "", "Show color preview for a theme")
@@ -1089,6 +1274,12 @@ func main() {
 		}
 	}
 
+	// Handle --stats flag (non-interactive mode)
+	if showStats {
+		printStats("", compareRemote)
+		os.Exit(0)
+	}
+
 	// Determine initial context mode and line numbers from config
 	fullContext := cfg.ContextMode == "full"
 
@@ -1138,6 +1329,7 @@ func main() {
 			animationFrame:     0,
 			animationMaxFrames: intro.GetMaxFrames(intro.AnimationType(animType)),
 			compareBranch:      compareBranch,
+			compareRemote:      compareRemote,
 			branchInput:        branchInput,
 			currentBranch:      currentBranch,
 			selectedBranchIdx:  0,
