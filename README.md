@@ -7,7 +7,7 @@
 
 A Terminal User Interface (TUI) application written in Go to display a side-by-side git diff with synchronized scrolling, multi-file navigation, customizable themes, search functionality, and beautiful color-coded statistics.
 
-> **Note:** Currently at v0.5.3.
+> **Note:** Currently at v0.6.0.
 
 ![diffbubble demo](public/diffbubble.gif)
 
@@ -20,6 +20,7 @@ A Terminal User Interface (TUI) application written in Go to display a side-by-s
 - **Side-by-side diff display**: View old and new versions simultaneously
 - **Synchronized scrolling**: Both panes scroll together for easy comparison
 - **Branch comparison**: Compare current branch against any other branch (local or remote)
+- **Branch statistics**: GitHub-style stats view showing changes and commits unique to your branch (press 's')
 - **Untracked files support**: Toggle display of new/untracked files with 'u'
 - **Search functionality**: Press '/' to search, real-time highlighting, navigate with 'n'/'N'
 - **Customizable themes**: 9 built-in themes with interactive cycling (press 't')
@@ -174,6 +175,8 @@ diffbubble [flags]
 - `--file=<filename>` - Open with specific file selected
 - `--staged` - Show only staged changes (git diff --cached)
 - `--unstaged` - Show only unstaged changes
+- `--stats` - Show branch statistics vs main and exit (non-interactive)
+- `--remote` - Compare local branch vs remote tracking branch
 - `--compare=<branch>` - Compare current branch to specified branch
 - `--branch=<branch>` - Alias for --compare
 - `--theme=<name>` - Set color theme (default: dark)
@@ -190,6 +193,12 @@ diffbubble --staged
 
 # Show only unstaged changes
 diffbubble --unstaged
+
+# Show branch statistics vs main
+diffbubble --stats
+
+# Show local vs remote statistics
+diffbubble --stats --remote
 
 # Open with README.md selected
 diffbubble --file=README.md
@@ -238,6 +247,7 @@ diffbubble --show-theme-colors dracula
 ### Toggles
 -   **Line numbers:** Press `n` to toggle line numbers on/off (or next match when search is active)
 -   **Context mode:** Press `c` to toggle between focus mode (changes only) and full context (entire file)
+-   **Statistics view:** Press `s` to toggle branch statistics view (shows current branch vs main)
 -   **Untracked files:** Press `u` to toggle display of untracked files
 -   **Theme cycling:** Press `t` to cycle through all available themes interactively
 

@@ -228,6 +228,43 @@ func ValidateBranch(branch string) error {
 	return nil
 }
 
+// GetMainBranch returns the name of the main branch (main or master).
+// Tries common main branch names and returns the first one found.
+func GetMainBranch() (string, error) {
+	// Try "main" first
+	cmd := exec.Command("git", "rev-parse", "--verify", "main")
+	if err := cmd.Run(); err == nil {
+		return "main", nil
+	}
+
+	// Fall back to "master"
+	cmd = exec.Command("git", "rev-parse", "--verify", "master")
+	if err := cmd.Run(); err == nil {
+		return "master", nil
+	}
+
+	return "", fmt.Errorf("neither 'main' nor 'master' branch found")
+}
+
+// GetUpstreamBranch returns the remote tracking branch for the current branch.
+// Returns empty string if no upstream is configured.
+func GetUpstreamBranch() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "@{upstream}")
+	out, err := cmd.Output()
+	if err != nil {
+		// No upstream configured
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 128 {
+				return "", fmt.Errorf("no upstream branch configured")
+			}
+		}
+		return "", fmt.Errorf("running git rev-parse: %w", err)
+	}
+
+	upstream := strings.TrimSpace(string(out))
+	return upstream, nil
+}
+
 // GetFileDiff returns the unified diff for a specific file.
 // contextLines specifies how many context lines to show (0 for default, -1 for full file)
 // mode specifies which changes to show (staged, unstaged, or all)

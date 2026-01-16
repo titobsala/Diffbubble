@@ -324,7 +324,7 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, 
 		if termWidth < 120 {
 			// Shortened version for narrow terminals
 			text = fmt.Sprintf(
-				"b:compare • tab:%s • j/k:nav • n:nums(%s) • c:ctx(%s) • u:new(%s) • /:find • q:quit",
+				"s:stats • b:compare • tab:%s • n:nums(%s) • c:ctx(%s) • u:new(%s) • /:find • q:quit",
 				focusHint,
 				lineNumHint,
 				contextHint,
@@ -333,7 +333,7 @@ func RenderFooter(showLineNumbers bool, fullContext bool, focusOnFileList bool, 
 		} else {
 			// Full version for wider terminals
 			text = fmt.Sprintf(
-				"b: branch compare • tab: switch (%s) • j/k: scroll • n: numbers (%s) • c: context (%s) • u: untracked (%s) • /: search • q/esc: quit",
+				"s: stats • b: branch compare • tab: switch (%s) • j/k: scroll • n: numbers (%s) • c: context (%s) • u: untracked (%s) • /: search • q/esc: quit",
 				focusHint,
 				lineNumHint,
 				contextHint,

@@ -106,7 +106,20 @@ The application follows a clean separation of concerns with three main layers an
     - Skips header lines
     - Returns empty slice if query is empty
 
-### 6. Main Application (`main.go`)
+### 6. Stats Layer (`stats/`)
+- `stats/stats.go`: Statistics aggregation and data structures (v0.6.0+)
+  - `Stats` struct: Aggregated statistics (total additions, deletions, files, max changes)
+  - `CommitInfo` struct: Single commit metadata (hash, message, author, date, additions, deletions)
+  - `CommitHistory` struct: List of recent commits
+  - `DualStats` struct: Both current changes and full branch stats
+  - `ComputeStats()`: Aggregates file statistics
+  - `ComputeDualStats()`: Computes both current and full branch statistics
+  - **Features**:
+    - Two stat sections: Current Changes (respects diff mode) and Full Branch (all changes)
+    - Recent commit history (10-20 commits)
+    - Supports all diff modes (staged, unstaged, all, branch compare)
+
+### 7. Main Application (`main.go`)
 - Implements Bubble Tea's Model-View-Update pattern with 3-column layout
 - Model state:
   - **File list**: `[]git.FileStat` stores all modified files, `selectedFile` tracks current selection
@@ -126,6 +139,10 @@ The application follows a clean separation of concerns with three main layers an
     - `searchMatches []search.Match` all found matches
     - `currentMatchIdx int` index of currently highlighted match (-1 if none)
     - `searchInAllFiles bool` whether to search across all files (not yet implemented)
+  - **Stats state** (v0.6.0+):
+    - `statsMode bool` indicates if stats view is active
+    - `statsData *stats.DualStats` cached statistics data
+    - `statsLoading bool` indicates if stats are being loaded
   - **CLI options**:
     - `diffMode git.DiffMode` for staged/unstaged/all changes
     - `initialFile string` for pre-selecting a file on startup
@@ -159,6 +176,7 @@ The application follows a clean separation of concerns with three main layers an
   - `--file=<filename>`: Open with specific file pre-selected (v0.2.0+)
   - `--staged`: Show only staged changes - git diff --cached (v0.2.0+)
   - `--unstaged`: Show only unstaged changes (v0.2.0+)
+  - `--stats`: Show repository statistics and exit (non-interactive) (v0.6.0+)
   - `--theme=<name>`: Set color theme (v0.3.0+)
   - `--list-themes`: List all available themes (v0.3.0+)
   - `--show-theme-colors <name>`: Preview theme colors with ANSI codes (v0.3.0+)
@@ -239,6 +257,7 @@ Context-specific error messages when no files are found:
 - `tab`: Switch focus between file list and diff panes
 - `n`: Toggle line numbers on/off (or next match when search is active)
 - `c`: Toggle between focus mode and full context
+- `s`: Toggle statistics view (v0.6.0+)
 - `t`: Cycle through themes interactively (v0.3.0+)
 - `/`: Enter search mode (v0.3.1+)
 
@@ -378,6 +397,19 @@ go fmt ./...
   - Search within current file
   - "No matches found" message when query has no results
   - Smart 'n' key behavior: next match when search active, toggle line numbers otherwise
+
+#### v0.6.0
+- ✅ **Statistics View** 📊
+  - GitHub-style statistics with additions/deletions
+  - Visual bar charts using block characters (█ ░ ▒ ▓)
+  - Two stat sections:
+    - Current Changes: Respects diff mode (staged/unstaged/all/branch compare)
+    - Full Branch: All changes regardless of mode
+  - Recent commit history (10-20 commits) with per-commit stats
+  - TUI: Press 's' key to toggle stats view, ESC to return to diff
+  - CLI: `--stats` flag for non-interactive display
+  - Theme-aware styling for all statistics
+  - Supports all diff modes (staged, unstaged, all, branch comparison)
 
 ### 🎯 High Priority (v0.4.0+)
 
