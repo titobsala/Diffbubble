@@ -48,7 +48,7 @@ archives:
     files:
       - LICENSE
       - README.md
-      - CLAUDE.md
+      - .claude/CLAUDE.md
 
 checksum:
   name_template: 'checksums.txt'
