@@ -25,7 +25,7 @@ import (
 
 const (
 	appTitle = "Git Diff Side-by-Side"
-	version  = "0.6.0"
+	version  = "0.6.1"
 )
 
 type focusPane int
@@ -131,6 +131,50 @@ func tick() tea.Cmd {
 	})
 }
 
+// resizeViewports recalculates and updates viewport dimensions based on current state
+// This should be called when entering/exiting branch comparison mode as the header height changes
+func (m *model) resizeViewports() {
+	if m.winWidth == 0 || m.winHeight == 0 {
+		return // Not yet initialized
+	}
+
+	// Calculate header height based on current mode
+	header := ui.TitleStyle.Render(appTitle)
+	if m.diffMode == git.DiffBranch && m.compareBranch != "" {
+		currentDisplay := m.currentBranch
+		if currentDisplay == "" {
+			currentDisplay = "(detached HEAD)"
+		}
+		branchInfo := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#89CFF0")).
+			Render(fmt.Sprintf(" [%s vs %s]", currentDisplay, m.compareBranch))
+		header = lipgloss.JoinHorizontal(lipgloss.Top, header, branchInfo)
+	}
+	headerHeight := lipgloss.Height(header) + 2 // +2: MarginBottom is included in Height, but need extra line for layout spacing
+	footerHeight := 3
+	borderHeight := 2
+	verticalMarginHeight := headerHeight + footerHeight + borderHeight
+
+	sidebarWidth := m.winWidth * 20 / 100
+	diffPaneWidth := m.winWidth * 40 / 100
+
+	if sidebarWidth > 4 {
+		sidebarWidth -= 4
+	}
+	if diffPaneWidth > 2 {
+		diffPaneWidth -= 2
+	}
+
+	viewportHeight := m.winHeight - verticalMarginHeight
+
+	m.fileListView.Width = sidebarWidth
+	m.fileListView.Height = viewportHeight
+	m.leftView.Width = diffPaneWidth
+	m.leftView.Height = viewportHeight
+	m.rightView.Width = diffPaneWidth
+	m.rightView.Height = viewportHeight
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmd  tea.Cmd
@@ -203,6 +247,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.compareBranch = selectedBranch
 					m.branchSelectorMode = false
 					m.branchInput.Reset()
+
+					// Resize viewports to account for taller header with branch info
+					m.resizeViewports()
 
 					// Reload files with new comparison
 					return m, loadFilesCmd(m.diffMode, m.compareBranch, "", m.showUntracked)
@@ -300,6 +347,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.diffMode == git.DiffBranch {
 				m.diffMode = m.previousDiffMode
 				m.compareBranch = ""
+
+				// Resize viewports to account for shorter header without branch info
+				m.resizeViewports()
 
 				// Reload files with previous mode
 				return m, loadFilesCmd(m.diffMode, "", "", m.showUntracked)
@@ -535,7 +585,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.winWidth = msg.Width
 		m.winHeight = msg.Height
 
-		headerHeight := 4 // 3 lines for title + 1 line margin (TitleStyle.MarginBottom)
+		// Dynamically calculate header height based on actual content
+		header := ui.TitleStyle.Render(appTitle)
+		if m.diffMode == git.DiffBranch && m.compareBranch != "" {
+			currentDisplay := m.currentBranch
+			if currentDisplay == "" {
+				currentDisplay = "(detached HEAD)"
+			}
+			branchInfo := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#89CFF0")).
+				Render(fmt.Sprintf(" [%s vs %s]", currentDisplay, m.compareBranch))
+			header = lipgloss.JoinHorizontal(lipgloss.Top, header, branchInfo)
+		}
+		headerHeight := lipgloss.Height(header) + 2 // +2: MarginBottom is included in Height, but need extra line for layout spacing
 		footerHeight := 3
 		borderHeight := 2
 		verticalMarginHeight := headerHeight + footerHeight + borderHeight
@@ -626,7 +688,7 @@ func (m model) View() string {
 		branchInfo := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#89CFF0")).
 			Render(fmt.Sprintf(" [%s vs %s]", currentDisplay, m.compareBranch))
-		header = lipgloss.JoinHorizontal(lipgloss.Center, header, branchInfo)
+		header = lipgloss.JoinHorizontal(lipgloss.Top, header, branchInfo)
 	}
 
 	// Add theme change notification if active
@@ -635,7 +697,7 @@ func (m model) View() string {
 			Foreground(lipgloss.Color("#F9E2AF")).
 			Bold(true).
 			Render(" " + m.themeChangeMsg)
-		header = lipgloss.JoinHorizontal(lipgloss.Center, header, themeMsg)
+		header = lipgloss.JoinHorizontal(lipgloss.Top, header, themeMsg)
 	}
 
 	focusOnFileList := m.focus == focusFileList
@@ -669,24 +731,28 @@ func (m model) View() string {
 	} else {
 
 		// Render file list sidebar with focus-aware styling
+		// MaxHeight prevents long file list items from wrapping and overflowing the sidebar
 		fileListContent := m.fileListView.View()
+		maxH := m.fileListView.Height + 2 // content + border top/bottom
 		var sidebarBox string
 		if focusOnFileList {
-			sidebarBox = ui.FileListStyleFocused.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
+			sidebarBox = ui.FileListStyleFocused.Width(m.fileListView.Width).Height(m.fileListView.Height).MaxHeight(maxH).Render(fileListContent)
 		} else {
-			sidebarBox = ui.FileListStyle.Width(m.fileListView.Width).Height(m.fileListView.Height).Render(fileListContent)
+			sidebarBox = ui.FileListStyle.Width(m.fileListView.Width).Height(m.fileListView.Height).MaxHeight(maxH).Render(fileListContent)
 		}
 
 		// Render diff panes with focus-aware styling
+		// MaxHeight prevents long diff lines from wrapping and overflowing the panes
+		diffMaxH := m.leftView.Height + 2
 		var leftBox, rightBox string
 		if focusOnFileList {
 			// Diff panes are unfocused
-			leftBox = ui.BorderStyleUnfocused.Width(m.leftView.Width).Render(m.leftView.View())
-			rightBox = ui.BorderStyleUnfocused.Width(m.rightView.Width).Render(m.rightView.View())
+			leftBox = ui.BorderStyleUnfocused.Width(m.leftView.Width).MaxHeight(diffMaxH).Render(m.leftView.View())
+			rightBox = ui.BorderStyleUnfocused.Width(m.rightView.Width).MaxHeight(diffMaxH).Render(m.rightView.View())
 		} else {
 			// Diff panes are focused
-			leftBox = ui.BorderStyleFocused.Width(m.leftView.Width).Render(m.leftView.View())
-			rightBox = ui.BorderStyleFocused.Width(m.rightView.Width).Render(m.rightView.View())
+			leftBox = ui.BorderStyleFocused.Width(m.leftView.Width).MaxHeight(diffMaxH).Render(m.leftView.View())
+			rightBox = ui.BorderStyleFocused.Width(m.rightView.Width).MaxHeight(diffMaxH).Render(m.rightView.View())
 		}
 
 		// Join horizontally: sidebar | left diff | right diff
